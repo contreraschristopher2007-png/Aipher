@@ -1,10 +1,12 @@
-const CACHE_NAME = 'aipher-v4.5.0';
+const CACHE_NAME = 'aipher-v4.5.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './styles.css',
   './app.js',
-  './manifest.json'
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -31,9 +33,13 @@ self.addEventListener('activate', event => {
   );
 });
 
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  
+
   if (url.hostname === 'api.groq.com' ||
       url.hostname === 'www.googleapis.com' ||
       url.hostname === '127.0.0.1' ||
@@ -48,10 +54,18 @@ self.addEventListener('fetch', event => {
 
         return fetch(event.request)
           .then(response => {
-            if (response.ok) {
+            if (response.ok && event.request.method === 'GET') {
               const responseClone = response.clone();
               caches.open(CACHE_NAME)
-                .then(cache => cache.put(event.request, responseClone));
+                .then(cache => {
+                  cache.put(event.request, responseClone);
+                  // Limitar tamaño del cache
+                  cache.keys().then(keys => {
+                    if (keys.length > 150) {
+                      cache.delete(keys[0]);
+                    }
+                  });
+                });
             }
             return response;
           })

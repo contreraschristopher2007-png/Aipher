@@ -9,6 +9,7 @@
   "orientation": "portrait",
   "lang": "es",
   "scope": "./",
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "icon-192.png",
@@ -21,6 +22,15 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nuevo chat",
+      "short_name": "Chat",
+      "description": "Iniciar una nueva conversación",
+      "url": "./?action=newchat",
+      "icons": [{"src": "icon-192.png", "sizes": "192x192"}]
     }
   ]
 }
