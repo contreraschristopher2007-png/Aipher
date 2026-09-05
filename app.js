@@ -1,6 +1,6 @@
 'use strict';
 const CONFIG = {
-  version: '4.6.0',
+  version: '4.7.0',
   offlineURL: 'http://127.0.0.1:8080/v1/chat/completions',
   healthURL: 'http://127.0.0.1:8080/health',
   youtubeURL: 'https://www.googleapis.com/youtube/v3/search',
@@ -37,6 +37,17 @@ const KOKORO_VOICES = [
   { id: 'bm_lewis', name: 'Lewis', lang: 'en-GB', gender: '👨', icon: '🎩' }
 ];
 
+const PIPER_VOICES = [
+  { id: 'es_ES-davefx-medium', name: 'Dave (España)', lang: 'es-ES', gender: '👨', icon: '🇪🇸' },
+  { id: 'es_ES-mls_9972-low', name: 'Carmen (España)', lang: 'es-ES', gender: '👩', icon: '🇪' },
+  { id: 'es_ES-mls_10246-low', name: 'Lucía (España)', lang: 'es-ES', gender: '👩', icon: '🇪' },
+  { id: 'es_ES-sharvard-medium', name: 'Sharvard (España)', lang: 'es-ES', gender: '👨', icon: '🇪🇸' },
+  { id: 'es_MX-ald-medium', name: 'Ald (México)', lang: 'es-MX', gender: '👨', icon: '🇲' },
+  { id: 'es_MX-claude-high', name: 'Claude (México)', lang: 'es-MX', gender: '👩', icon: '🇲🇽' },
+  { id: 'es_AR-daniela-x_low', name: 'Daniela (Argentina)', lang: 'es-AR', gender: '👩', icon: '🇦🇷' },
+  { id: 'es_CO-diana-x_low', name: 'Diana (Colombia)', lang: 'es-CO', gender: '👩', icon: '🇨🇴' }
+];
+
 const DEFAULT = {
   engine: 'online',
   onlineProvider: 'groq',
@@ -48,6 +59,7 @@ const DEFAULT = {
   voiceMuted: false,
   voiceEngine: 'browser',
   kokoroVoice: 'af_heart',
+  piperVoice: 'es_ES-davefx-medium',
   voiceRate: 1,
   voicePitch: 1,
   voiceVolume: 1,
@@ -81,6 +93,10 @@ let kokoroLoading = false;
 let kokoroLoaded = false;
 let kokoroPlayer = null;
 let kokoroProgressMap = {};
+let piperClients = {};
+let piperLoading = false;
+let piperLoadedVoice = null;
+let piperPlayer = null;
 
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -290,13 +306,18 @@ function updateMuteUI() {
   if (bubble) bubble.setAttribute('aria-pressed', String(state.voiceMuted));
 }
 
+function stopAllPlayers() {
+  if (kokoroPlayer) { try { kokoroPlayer.pause(); } catch (e) {} kokoroPlayer = null; }
+  if (piperPlayer) { try { piperPlayer.pause(); } catch (e) {} piperPlayer = null; }
+}
+
 function toggleMute() {
   state.voiceMuted = !state.voiceMuted;
   saveState();
   updateMuteUI();
   if (state.voiceMuted) {
     if ('speechSynthesis' in window) speechSynthesis.cancel();
-    if (kokoroPlayer) { try { kokoroPlayer.pause(); } catch (e) {} kokoroPlayer = null; }
+    stopAllPlayers();
     speaking = false;
     voiceBusy = false;
     stopRecognitionOnly();
@@ -651,35 +672,37 @@ function configureVoices() {
     selectedVoice = allVoices[0] || null;
     return;
   }
-  selectedVoice = state.voiceName ? (voices.find(v => v.name === state.voiceName) || voices[0]) : voices[0];
+  const preferred = voices.find(v => /google/i.test(v.name));
+  selectedVoice = state.voiceName ? (voices.find(v => v.name === state.voiceName) || preferred || voices[0]) : (preferred || voices[0]);
 }
 
 if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = configureVoices;
 
-// --- KOKORO TTS (corregido: from_pretrained + voces reales + progreso real) ---
-function kokoroBarHTML() {
-  return '<div class="kokoro-download-bar"><div class="download-title"><div class="spinner"></div><span id="kokoroStatusText">Preparando descarga...</span></div><div class="progress-track"><div class="progress-fill" id="kokoroProgressFill"></div></div><div class="progress-text" id="kokoroProgressText">0%</div><div class="progress-status" id="kokoroStatusSub">Conectando al servidor...</div></div>';
+// --- BARRA DE PROGRESO TTS (compartida por Kokoro y Piper) ---
+function ttsBarHTML() {
+  return '<div class="kokoro-download-bar"><div class="download-title"><div class="spinner"></div><span id="ttsStatusText">Preparando descarga...</span></div><div class="progress-track"><div class="progress-fill" id="ttsProgressFill"></div></div><div class="progress-text" id="ttsProgressText">0%</div><div class="progress-status" id="ttsStatusSub">Conectando al servidor...</div></div>';
 }
 
-function paintKokoroBar(pct, statusText) {
-  const fill = $('kokoroProgressFill');
-  const text = $('kokoroProgressText');
-  const sub = $('kokoroStatusSub');
+function paintTTSBar(pct, statusText) {
+  const fill = $('ttsProgressFill');
+  const text = $('ttsProgressText');
+  const sub = $('ttsStatusSub');
   if (fill) fill.style.width = pct + '%';
   if (text) text.textContent = pct + '%';
   if (sub && statusText) sub.textContent = statusText;
 }
 
-function showKokoroReady() {
-  const cont = $('kokoroProgressContainer');
-  if (cont) cont.innerHTML = '<div class="kokoro-ready">✅ Kokoro listo — voz neuronal activa</div>';
+function showTTSReady(msg) {
+  const cont = $('ttsProgressContainer');
+  if (cont) cont.innerHTML = '<div class="kokoro-ready">✅ ' + (msg || 'Voz lista') + '</div>';
 }
 
-function showKokoroError(msg) {
-  const cont = $('kokoroProgressContainer');
-  if (cont) cont.innerHTML = '<div class="kokoro-error">⚠️ ' + escapeHTML(msg || 'Error al cargar Kokoro.') + '</div>';
+function showTTSError(msg) {
+  const cont = $('ttsProgressContainer');
+  if (cont) cont.innerHTML = '<div class="kokoro-error">⚠️ ' + escapeHTML(msg || 'Error al cargar la voz.') + '</div>';
 }
 
+// --- KOKORO (inglés) ---
 function kokoroProgress(info) {
   if (!info || !info.status) return;
   if (info.status === 'progress' && info.total) {
@@ -687,9 +710,9 @@ function kokoroProgress(info) {
     let loaded = 0, total = 0;
     Object.values(kokoroProgressMap).forEach(f => { loaded += f.loaded; total += f.total; });
     const pct = total ? Math.min(99, Math.floor((loaded / total) * 100)) : 5;
-    paintKokoroBar(pct, 'Descargando modelo de voz...');
+    paintTTSBar(pct, 'Descargando modelo inglés...');
   } else if (info.status === 'ready') {
-    paintKokoroBar(100, '¡Listo!');
+    paintTTSBar(100, '¡Listo!');
   }
 }
 
@@ -698,7 +721,7 @@ async function initKokoro() {
   if (kokoroLoading) return null;
   kokoroLoading = true;
   kokoroProgressMap = {};
-  paintKokoroBar(2, 'Conectando al servidor...');
+  paintTTSBar(2, 'Conectando al servidor...');
   try {
     const mod = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.1.0/+esm');
     const tts = await mod.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
@@ -707,12 +730,12 @@ async function initKokoro() {
     });
     kokoroTTS = tts;
     kokoroLoaded = true;
-    paintKokoroBar(100, '¡Listo!');
-    setTimeout(showKokoroReady, 600);
+    paintTTSBar(100, '¡Listo!');
+    setTimeout(() => showTTSReady('Kokoro listo — voz inglesa activa'), 600);
     return tts;
   } catch (err) {
     console.error('Kokoro:', err);
-    showKokoroError('Error al cargar Kokoro. Revisa tu conexión y vuelve a intentarlo.');
+    showTTSError('Error al cargar Kokoro. Revisa tu conexión.');
     return null;
   } finally {
     kokoroLoading = false;
@@ -721,7 +744,7 @@ async function initKokoro() {
 
 async function speakWithKokoro(text, done) {
   const tts = kokoroTTS || await initKokoro();
-  if (!tts) { if (done) done(); return; }
+  if (!tts) { speakBrowser(text, done); return; }
   const voiceId = state.kokoroVoice || 'af_heart';
   const clean = String(text).replace(/[*_#`>]/g, '').slice(0, CONFIG.maxSpeechChars);
   try {
@@ -750,15 +773,85 @@ async function speakWithKokoro(text, done) {
   }
 }
 
-function speak(text, done) {
-  if (!state.voiceEnabled || state.voiceMuted) { setBubbleIdle(); if (done) done(); return; }
-  if (state.voiceEngine === 'kokoro') { speakWithKokoro(text, done); return; }
+// --- PIPER (español) ---
+async function initPiper(voiceId) {
+  if (piperClients[voiceId]) return piperClients[voiceId];
+  if (piperLoading) return null;
+  piperLoading = true;
+  toast('⏳ Descargando voz española (solo la primera vez)...');
+  paintTTSBar(5, 'Descargando voz española...');
+  const sim = setInterval(() => {
+    const fill = $('ttsProgressFill');
+    if (fill) {
+      const cur = parseInt(fill.style.width) || 5;
+      if (cur < 90) paintTTSBar(cur + 3, 'Descargando voz española...');
+    }
+  }, 600);
+  try {
+    const mod = await import('https://cdn.jsdelivr.net/npm/@mintplex-labs/piper-tts-web/+esm');
+    const client = new mod.PiperTTSClient({ voiceId });
+    piperClients[voiceId] = client;
+    piperLoadedVoice = voiceId;
+    clearInterval(sim);
+    paintTTSBar(100, '¡Lista!');
+    setTimeout(() => showTTSReady('Voz española lista'), 600);
+    return client;
+  } catch (err) {
+    console.error('Piper:', err);
+    clearInterval(sim);
+    showTTSError('No se pudo cargar la voz española. Usaré la voz del navegador.');
+    return null;
+  } finally {
+    piperLoading = false;
+  }
+}
+
+async function speakWithPiper(text, done) {
+  const voiceId = state.piperVoice || 'es_ES-davefx-medium';
+  const client = piperClients[voiceId] || await initPiper(voiceId);
+  if (!client) { speakBrowser(text, done); return; }
+  const clean = String(text).replace(/[*_#`>]/g, '').slice(0, CONFIG.maxSpeechChars);
+  try {
+    speaking = true;
+    setBubbleSpeaking();
+    if (voiceSession) { $('voiceOrb')?.classList.remove('listening', 'thinking'); $('voiceOrb')?.classList.add('speaking'); }
+    const blob = await client.textToBlob(clean);
+    const url = URL.createObjectURL(blob);
+    piperPlayer = new Audio(url);
+    piperPlayer.onended = piperPlayer.onerror = () => {
+      URL.revokeObjectURL(url);
+      speaking = false;
+      setBubbleIdle();
+      $('voiceOrb')?.classList.remove('speaking');
+      piperPlayer = null;
+      if (done) done();
+    };
+    await piperPlayer.play();
+  } catch (err) {
+    console.error('Piper play:', err);
+    speaking = false;
+    setBubbleIdle();
+    $('voiceOrb')?.classList.remove('speaking');
+    toast('⚠️ La voz española falló; uso la del navegador');
+    speakBrowser(text, done);
+  }
+}
+
+// --- NAVEGADOR (fallback) ---
+function speakBrowser(text, done) {
   if (!('speechSynthesis' in window)) { setBubbleIdle(); if (done) done(); return; }
   const cleanText = String(text).replace(/[*_#`]/g, '');
   const chunks = cleanText.match(new RegExp('.{1,' + CONFIG.maxSpeechChars + '}', 'g')) || [cleanText];
   speakQueue = chunks;
   isSpeakingQueue = true;
   speakNextChunk(done);
+}
+
+function speak(text, done) {
+  if (!state.voiceEnabled || state.voiceMuted) { setBubbleIdle(); if (done) done(); return; }
+  if (state.voiceEngine === 'kokoro') { speakWithKokoro(text, done); return; }
+  if (state.voiceEngine === 'piper') { speakWithPiper(text, done); return; }
+  speakBrowser(text, done);
 }
 
 function speakNextChunk(done) {
@@ -914,7 +1007,7 @@ function stopVoiceSession() {
   voiceBusy = false;
   speakQueue = [];
   isSpeakingQueue = false;
-  if (kokoroPlayer) { try { kokoroPlayer.pause(); } catch (e) {} kokoroPlayer = null; }
+  stopAllPlayers();
   try { voiceRecognition?.stop(); } catch (error) {}
   voiceRecognition = null;
   if ('speechSynthesis' in window) speechSynthesis.cancel();
@@ -1274,27 +1367,44 @@ function openSettingsSection(section) {
     content = '<div class="form"><label>Nombre</label><input id="cfgName" value="' + escapeAttribute(state.name) + '"></div><div class="form"><label>Personalidad</label><select id="cfgPersonality"><option value="JARVIS"' + (state.personality === 'JARVIS' ? ' selected' : '') + '>JARVIS 🔥</option><option value="Amigable"' + (state.personality === 'Amigable' ? ' selected' : '') + '>Amigable 😊</option><option value="Formal"' + (state.personality === 'Formal' ? ' selected' : '') + '>Formal 🎩</option></select></div><button class="modalBtn" onclick="saveProfile()">💾 Guardar</button>';
   } else if (section === 'voice') {
     title = '🎙️ Estilo de Voz';
-    const kokoroActive = state.voiceEngine === 'kokoro';
+    const eng = state.voiceEngine;
+    let readyHTML = '';
+    if (eng === 'piper' && piperLoadedVoice) readyHTML = '<div class="kokoro-ready">✅ Voz española lista</div>';
+    if (eng === 'kokoro' && kokoroLoaded) readyHTML = '<div class="kokoro-ready">✅ Kokoro listo — voz inglesa</div>';
+
+    let voicesHTML = '';
+    if (eng === 'browser') {
+      const esVoices = ('speechSynthesis' in window) ? speechSynthesis.getVoices().filter(v => (v.lang || '').toLowerCase().startsWith('es')) : [];
+      voicesHTML = '<div class="form"><label>Voz del dispositivo</label><select id="cfgBrowserVoice" onchange="setBrowserVoice(this.value)">' +
+        (esVoices.length
+          ? esVoices.map(v => '<option value="' + escapeAttribute(v.name) + '"' + (state.voiceName === v.name ? ' selected' : '') + '>' + escapeHTML(v.name) + ' (' + v.lang + ')</option>').join('')
+          : '<option value="">Sin voces en español</option>') +
+        '</select></div>';
+    } else {
+      const list = (eng === 'piper') ? PIPER_VOICES : KOKORO_VOICES;
+      const current = (eng === 'piper') ? state.piperVoice : state.kokoroVoice;
+      voicesHTML = '<label style="display:block;margin:10px 0 8px;color:var(--text-soft);font-size:12px;font-weight:600">Voces ' + (eng === 'piper' ? 'españolas' : 'inglesas') + ' (toca para elegir):</label>' +
+        '<div class="voice-selector-grid">' +
+        list.map(v =>
+          '<div class="voice-option' + (current === v.id ? ' selected' : '') + '" onclick="selectTTSVoice(\'' + v.id + '\')">' +
+          '<span class="voice-gender">' + v.gender + '</span>' +
+          '<div class="voice-icon">' + v.icon + '</div>' +
+          '<div class="voice-name">' + v.name + '</div>' +
+          '<div class="voice-lang">' + v.lang + '</div>' +
+          '<button class="voice-preview-btn" onclick="event.stopPropagation();previewTTSVoice(\'' + v.id + '\')">🔊 Probar</button>' +
+          '</div>'
+        ).join('') +
+        '</div>';
+    }
+
     content =
       '<div class="voice-engine-selector"><label>Motor de voz</label><div class="engine-options">' +
-      '<div class="engine-option-voice' + (kokoroActive ? '' : ' active') + '" onclick="setVoiceEngine(\'browser\')"><div class="engine-icon">🌐</div><div class="engine-name">Navegador</div><div class="engine-desc">Rápido, sin descarga</div></div>' +
-      '<div class="engine-option-voice' + (kokoroActive ? ' active' : '') + '" onclick="setVoiceEngine(\'kokoro\')"><div class="engine-icon">🎭</div><div class="engine-name">Kokoro</div><div class="engine-desc">Voz neuronal natural</div></div>' +
+      '<div class="engine-option-voice' + (eng === 'browser' ? ' active' : '') + '" onclick="setVoiceEngine(\'browser\')"><div class="engine-icon">🌐</div><div class="engine-name">Navegador</div><div class="engine-desc">Rápida, sin descarga</div></div>' +
+      '<div class="engine-option-voice' + (eng === 'piper' ? ' active' : '') + '" onclick="setVoiceEngine(\'piper\')"><div class="engine-icon">🇪</div><div class="engine-name">Español</div><div class="engine-desc">Voz neuronal natural</div></div>' +
+      '<div class="engine-option-voice' + (eng === 'kokoro' ? ' active' : '') + '" onclick="setVoiceEngine(\'kokoro\')"><div class="engine-icon">🎭</div><div class="engine-name">Inglés</div><div class="engine-desc">Kokoro natural</div></div>' +
       '</div></div>' +
-      '<div id="kokoroProgressContainer">' +
-        (kokoroLoaded ? '<div class="kokoro-ready">✅ Kokoro listo — voz neuronal activa</div>' : (kokoroLoading ? kokoroBarHTML() : '')) +
-      '</div>' +
-      '<label style="display:block;margin:10px 0 8px;color:var(--text-soft);font-size:12px;font-weight:600">Voces Kokoro (toca para elegir):</label>' +
-      '<div class="voice-selector-grid">' +
-      KOKORO_VOICES.map(v =>
-        '<div class="voice-option' + (state.kokoroVoice === v.id ? ' selected' : '') + '" onclick="selectKokoroVoice(\'' + v.id + '\')">' +
-        '<span class="voice-gender">' + v.gender + '</span>' +
-        '<div class="voice-icon">' + v.icon + '</div>' +
-        '<div class="voice-name">' + v.name + '</div>' +
-        '<div class="voice-lang">' + v.lang + '</div>' +
-        '<button class="voice-preview-btn" onclick="event.stopPropagation();previewVoice(\'' + v.id + '\')">🔊 Probar</button>' +
-        '</div>'
-      ).join('') +
-      '</div>' +
+      '<div id="ttsProgressContainer">' + readyHTML + '</div>' +
+      voicesHTML +
       '<div class="form"><label>Velocidad: <span id="rateLabel">' + state.voiceRate + '</span>x</label><input id="cfgRate" type="range" min=".5" max="2" step=".1" value="' + state.voiceRate + '" oninput="document.getElementById(\'rateLabel\').textContent=this.value"></div>' +
       '<div class="form"><label>Tono</label><input id="cfgPitch" type="range" min=".5" max="1.5" step=".05" value="' + state.voicePitch + '"></div>' +
       '<label><input id="cfgVoiceEnabled" type="checkbox"' + (state.voiceEnabled ? ' checked' : '') + '> Voz activa</label>' +
@@ -1336,51 +1446,69 @@ function openSettingsSection(section) {
     content = '<button class="modalBtn" onclick="exportData()">📤 Exportar</button><button class="modalBtn" onclick="importData()">📥 Importar</button><button class="danger" onclick="clearAllData()">🗑️ Borrar todo</button>';
   } else {
     title = 'ℹ️ Acerca';
-    content = '<p style="text-align:center">🔥 <strong>Aipher v' + CONFIG.version + '</strong><br>Asistente personal con IA<br>🌐 Groq · 🏠 llama.cpp · 📺 YouTube ·  Kokoro TTS<br><br><small>Las API keys se almacenan localmente en tu navegador.</small></p>';
+    content = '<p style="text-align:center">🔥 <strong>Aipher v' + CONFIG.version + '</strong><br>Asistente personal con IA<br>🌐 Groq · 🏠 llama.cpp · 📺 YouTube · 🇸 Piper ·  Kokoro<br><br><small>Las API keys se almacenan localmente en tu navegador.</small></p>';
   }
   modal(title, content);
   renderLogoSystem();
 }
 
 function setVoiceEngine(engine) {
-  state.voiceEngine = (engine === 'kokoro') ? 'kokoro' : 'browser';
+  state.voiceEngine = (engine === 'kokoro' || engine === 'piper') ? engine : 'browser';
   saveState();
   openSettingsSection('voice');
-  if (state.voiceEngine === 'kokoro' && !kokoroTTS && !kokoroLoading) {
-    const cont = $('kokoroProgressContainer');
-    if (cont) cont.innerHTML = kokoroBarHTML();
-    initKokoro();
+}
+
+function selectTTSVoice(id) {
+  if (id.indexOf('es_') === 0) {
+    state.piperVoice = id;
+    state.voiceEngine = 'piper';
+  } else {
+    state.kokoroVoice = id;
+    state.voiceEngine = 'kokoro';
+  }
+  saveState();
+  openSettingsSection('voice');
+}
+
+async function previewTTSVoice(id) {
+  stopAllPlayers();
+  if (id.indexOf('es_') === 0) {
+    const v = PIPER_VOICES.find(x => x.id === id);
+    const client = piperClients[id] || await initPiper(id);
+    if (!client) return;
+    try {
+      const blob = await client.textToBlob('Hola, soy ' + (v ? v.name : 'Aipher') + '. Así sueno en español.');
+      const url = URL.createObjectURL(blob);
+      piperPlayer = new Audio(url);
+      piperPlayer.onended = () => { URL.revokeObjectURL(url); piperPlayer = null; };
+      await piperPlayer.play();
+    } catch (err) {
+      console.error('Preview Piper:', err);
+      toast('⚠️ Error al reproducir. Prueba otra voz.');
+    }
+  } else {
+    const tts = kokoroTTS || await initKokoro();
+    if (!tts) return;
+    const v = KOKORO_VOICES.find(x => x.id === id);
+    try {
+      const audio = await tts.generate('Hi, I am ' + (v ? v.name : 'Aipher') + '. This is my English voice.', { voice: id, speed: 1 });
+      const blob = audio.toBlob();
+      const url = URL.createObjectURL(blob);
+      kokoroPlayer = new Audio(url);
+      kokoroPlayer.onended = () => { URL.revokeObjectURL(url); kokoroPlayer = null; };
+      await kokoroPlayer.play();
+    } catch (err) {
+      console.error('Preview Kokoro:', err);
+      toast('⚠️ Error al reproducir');
+    }
   }
 }
 
-function selectKokoroVoice(voiceId) {
-  state.kokoroVoice = voiceId;
-  if (state.voiceEngine !== 'kokoro') state.voiceEngine = 'kokoro';
+function setBrowserVoice(name) {
+  state.voiceName = name;
+  configureVoices();
   saveState();
-  openSettingsSection('voice');
-  if (!kokoroTTS && !kokoroLoading) {
-    const cont = $('kokoroProgressContainer');
-    if (cont) cont.innerHTML = kokoroBarHTML();
-    initKokoro();
-  }
-}
-
-async function previewVoice(voiceId) {
-  const tts = kokoroTTS || await initKokoro();
-  if (!tts) return;
-  const v = KOKORO_VOICES.find(x => x.id === voiceId);
-  try {
-    if (kokoroPlayer) { try { kokoroPlayer.pause(); } catch (e) {} kokoroPlayer = null; }
-    const audio = await tts.generate('Hola, soy ' + (v ? v.name : 'Aipher') + '. Así suena mi voz.', { voice: voiceId, speed: 1 });
-    const blob = audio.toBlob();
-    const url = URL.createObjectURL(blob);
-    kokoroPlayer = new Audio(url);
-    kokoroPlayer.onended = () => { URL.revokeObjectURL(url); kokoroPlayer = null; };
-    await kokoroPlayer.play();
-  } catch (err) {
-    console.error('Preview:', err);
-    toast('⚠️ Error al reproducir');
-  }
+  toast('✅ Voz del dispositivo guardada');
 }
 
 function modal(title, content) {
@@ -1394,7 +1522,7 @@ function closeModal() { $('modalBackdrop')?.classList.add('hidden'); }
 
 function saveProfile() { state.name = $('cfgName')?.value.trim() || 'Usuario'; state.personality = $('cfgPersonality')?.value || 'JARVIS'; saveState(); renderMessages(); closeModal(); toast('✅ Guardado'); }
 function saveVoice() { state.voiceRate = Number($('cfgRate')?.value) || 1; state.voicePitch = Number($('cfgPitch')?.value) || 1; state.voiceEnabled = Boolean($('cfgVoiceEnabled')?.checked); configureVoices(); saveState(); closeModal(); toast('✅ Guardado'); }
-function testVoice() { try { speak('Hola, soy Aipher.'); } catch (e) { toast('⚠️ No hay voces disponibles en este dispositivo'); } }
+function testVoice() { try { speak('Hola, soy Aipher. Esta es una prueba de voz.'); } catch (e) { toast('⚠️ No hay voces disponibles en este dispositivo'); } }
 function saveAppearance() { state.theme = $('cfgTheme')?.value || 'dark'; state.fondo = $('cfgBg')?.value.trim() || ''; saveState(); applyTheme(); applyBackground(); closeModal(); toast('✅ Guardado'); }
 function clearBackground() { state.fondo = ''; saveState(); applyBackground(); closeModal(); toast('🗑️ Quitado'); }
 
@@ -1624,5 +1752,6 @@ Object.assign(window, {
   removeFile, pickFiles, saveProfile, saveVoice, testVoice, saveAppearance,
   clearBackground, loadBackgroundFile, saveBubble, resetBubble, openBubbleGifPicker,
   saveAPI, exportData, importData, clearAllData, setEngine, setOnlineProvider,
-  forgetMemory, clearMemory, setVoiceEngine, selectKokoroVoice, previewVoice
+  forgetMemory, clearMemory, setVoiceEngine, selectTTSVoice, previewTTSVoice,
+  setBrowserVoice
 });
