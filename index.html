@@ -9,8 +9,6 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  
-  <!-- Dependencias para Markdown y lectura de archivos -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -19,7 +17,6 @@
   <a href="#appMain" class="skip-link">Saltar al contenido</a>
 
   <div id="appMain">
-    <!-- Topbar -->
     <header class="topbar">
       <div class="topbar-brand">
         <button id="menuBtn" class="icon-btn" aria-label="Menú">☰</button>
@@ -30,17 +27,16 @@
       </div>
       <div class="topbar-actions">
         <button id="engineBadge" class="engine-badge">🟢 ONLINE</button>
+        <button id="appearanceBtn" class="icon-btn" aria-label="Cambiar tema">☀️</button>
         <button id="settingsBtn" class="icon-btn" aria-label="Ajustes">⚙️</button>
       </div>
     </header>
 
-    <!-- Mode Tabs -->
     <div class="mode-tabs">
       <button id="chatModeBtn" class="mode-tab active">💬 Chat</button>
       <button id="voiceModeBtn" class="mode-tab">🎙️ Voz</button>
     </div>
 
-    <!-- Chat Mode -->
     <div id="chatMode" class="mode active">
       <div id="chatArea" class="chat-area">
         <div id="messages" class="messages"></div>
@@ -55,7 +51,7 @@
         </div>
       </div>
       <div class="composer">
-        <button id="attachBtn" class="composer-btn" aria-label="Adjuntar"></button>
+        <button id="attachBtn" class="composer-btn" aria-label="Adjuntar">📎</button>
         <div class="composer-input-wrap">
           <textarea id="messageInput" placeholder="Escribe un mensaje..." rows="1"></textarea>
           <span id="charCounter" class="char-counter">0/10000</span>
@@ -65,7 +61,6 @@
       </div>
     </div>
 
-    <!-- Voice Mode -->
     <div id="voiceMode" class="mode">
       <div class="voice-stage">
         <div id="voiceOrb" class="voice-orb">
@@ -80,13 +75,12 @@
         </div>
       </div>
       <div class="voice-controls">
-        <button id="voiceStopBtn" class="voice-control" aria-label="Detener"></button>
+        <button id="voiceStopBtn" class="voice-control" aria-label="Detener">⏹</button>
         <button id="voiceTalkBtn" class="voice-control voice-main-btn" aria-label="Hablar">🎙️</button>
         <button id="voiceMuteBtn" class="voice-control" aria-label="Silenciar">🔊</button>
       </div>
     </div>
 
-    <!-- Floating Assistant -->
     <div id="floatingAssistant" class="floating-assistant idle" tabindex="0" role="button" aria-pressed="false">
       <div id="bubbleLogoContainer" class="bubble-content">
         <div id="bubbleLogo" data-aipher-logo>
@@ -95,16 +89,14 @@
       </div>
       <img id="bubbleGifImage" class="bubble-gif hidden" alt="Aipher GIF">
       <div class="bubble-rings"><div class="ring"></div><div class="ring ring2"></div></div>
-      <div id="muteIndicator" class="mute-indicator"></div>
+      <div id="muteIndicator" class="mute-indicator">🔇</div>
     </div>
 
-    <!-- Video Player Modal -->
     <div id="videoPlayer" class="video-player hidden">
       <button id="closeVideoBtn" class="video-close-btn" aria-label="Cerrar video">×</button>
       <iframe id="videoFrame" allow="autoplay; encrypted-media" allowfullscreen></iframe>
     </div>
 
-    <!-- Side Menu (Chats) -->
     <aside id="sideMenu">
       <div class="panel-header">
         <div class="panel-title">
@@ -116,14 +108,13 @@
         <button id="closeMenuBtn" class="icon-btn" aria-label="Cerrar menú">×</button>
       </div>
       <div class="search-box">
-        <span></span>
+        <span>🔎</span>
         <input id="chatSearch" type="text" placeholder="Buscar chats...">
       </div>
       <button id="newChatBtn" class="primary-btn">＋ Nuevo chat</button>
       <div id="chatList" class="chat-list"></div>
     </aside>
 
-    <!-- Settings Panel -->
     <aside id="settingsPanel">
       <div class="panel-header">
         <div class="panel-title">
@@ -145,7 +136,7 @@
           <span>🫧</span><span><strong>Burbuja</strong><small>Animación y GIF</small></span>
         </button>
         <button class="setting-btn" data-section="memory">
-          <span></span><span><strong>Memoria</strong><small>Lo que Aipher recuerda de ti</small></span>
+          <span>📚</span><span><strong>Memoria</strong><small>Lo que Aipher recuerda de ti</small></span>
         </button>
         <button class="setting-btn" data-section="engine">
           <span>🧠</span><span><strong>Motor IA</strong><small id="settingsEngineStatus">🌐 Online — Groq</small></span>
@@ -158,12 +149,11 @@
           <span>💾</span><span><strong>Datos</strong><small>Importar y exportar</small></span>
         </button>
         <button class="setting-btn" data-section="about">
-          <span>ℹ️</span><span><strong>Acerca de</strong><small>Aipher v4.6.1</small></span>
+          <span>ℹ️</span><span><strong>Acerca de</strong><small>Aipher v4.6.0</small></span>
         </button>
       </div>
     </aside>
 
-    <!-- Modal Backdrop -->
     <div id="modalBackdrop" class="modal-backdrop hidden">
       <div class="modal">
         <div class="modal-header">
@@ -174,13 +164,9 @@
       </div>
     </div>
 
-    <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
-    
-    <!-- Connection Status -->
     <div id="connectionStatus" class="connection-status hidden"></div>
 
-    <!-- Hidden Logo Template for cloning -->
     <svg id="aipherLogoTemplate" class="aipher-logo-template" viewBox="0 0 24 24">
       <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
     </svg>

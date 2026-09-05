@@ -1,6 +1,6 @@
 'use strict';
 const CONFIG = {
-  version: '4.6.1',
+  version: '4.6.0',
   offlineURL: 'http://127.0.0.1:8080/v1/chat/completions',
   healthURL: 'http://127.0.0.1:8080/health',
   youtubeURL: 'https://www.googleapis.com/youtube/v3/search',
@@ -17,32 +17,24 @@ const CONFIG = {
 };
 
 const PROVIDERS = {
-  groq: { 
-    label: 'Groq', 
-    url: 'https://api.groq.com/openai/v1/chat/completions', 
-    model: 'llama-3.1-70b-versatile',
-    keyPlaceholder: 'gsk_...' 
-  }
+  groq: { label: 'Groq', url: 'https://api.groq.com/openai/v1/chat/completions', model: 'openai/gpt-oss-120b', keyPlaceholder: 'gsk_...' }
 };
 
 const KOKORO_VOICES = [
-  { id: 'af', name: 'Alice', lang: 'en-US', gender: '', icon: '🎤' },
+  { id: 'af_heart', name: 'Heart', lang: 'en-US', gender: '👩', icon: '❤️' },
   { id: 'af_bella', name: 'Bella', lang: 'en-US', gender: '👩', icon: '🎵' },
   { id: 'af_nicole', name: 'Nicole', lang: 'en-US', gender: '👩', icon: '🎙️' },
   { id: 'af_sarah', name: 'Sarah', lang: 'en-US', gender: '👩', icon: '🎶' },
   { id: 'af_sky', name: 'Sky', lang: 'en-US', gender: '👩', icon: '🌸' },
+  { id: 'af_nova', name: 'Nova', lang: 'en-US', gender: '👩', icon: '⭐' },
   { id: 'am_adam', name: 'Adam', lang: 'en-US', gender: '👨', icon: '🎤' },
-  { id: 'am_michael', name: 'Michael', lang: 'en-US', gender: '👨', icon: '🎵' },
-  { id: 'bf_emma', name: 'Emma', lang: 'en-GB', gender: '👩', icon: '🇧' },
+  { id: 'am_michael', name: 'Michael', lang: 'en-US', gender: '👨', icon: '🎧' },
+  { id: 'am_liam', name: 'Liam', lang: 'en-US', gender: '👨', icon: '🎹' },
+  { id: 'am_onyx', name: 'Onyx', lang: 'en-US', gender: '👨', icon: '⚫' },
+  { id: 'bf_emma', name: 'Emma', lang: 'en-GB', gender: '👩', icon: '🇬🇧' },
   { id: 'bf_isabella', name: 'Isabella', lang: 'en-GB', gender: '👩', icon: '🎭' },
   { id: 'bm_george', name: 'George', lang: 'en-GB', gender: '👨', icon: '🇬🇧' },
-  { id: 'bm_lewis', name: 'Lewis', lang: 'en-GB', gender: '👨', icon: '' },
-  { id: 'af_alloy', name: 'Alloy', lang: 'en-US', gender: '👨', icon: '⚡' },
-  { id: 'af_echo', name: 'Echo', lang: 'en-US', gender: '👨', icon: '' },
-  { id: 'af_fable', name: 'Fable', lang: 'en-US', gender: '👩', icon: '📖' },
-  { id: 'af_onyx', name: 'Onyx', lang: 'en-US', gender: '👨', icon: '⚫' },
-  { id: 'af_nova', name: 'Nova', lang: 'en-US', gender: '👩', icon: '⭐' },
-  { id: 'af_shimmer', name: 'Shimmer', lang: 'en-US', gender: '👩', icon: '✨' }
+  { id: 'bm_lewis', name: 'Lewis', lang: 'en-GB', gender: '👨', icon: '🎩' }
 ];
 
 const DEFAULT = {
@@ -55,11 +47,11 @@ const DEFAULT = {
   voiceEnabled: true,
   voiceMuted: false,
   voiceEngine: 'browser',
+  kokoroVoice: 'af_heart',
   voiceRate: 1,
   voicePitch: 1,
   voiceVolume: 1,
   voiceName: '',
-  kokoroVoice: 'af_nicole',
   bubbleEnabled: true,
   bubbleGif: '',
   theme: 'dark',
@@ -87,6 +79,8 @@ let isSpeakingQueue = false;
 let kokoroTTS = null;
 let kokoroLoading = false;
 let kokoroLoaded = false;
+let kokoroPlayer = null;
+let kokoroProgressMap = {};
 
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -157,21 +151,22 @@ function bindEvents() {
   $('voiceTalkBtn')?.addEventListener('click', toggleVoiceSession);
   $('voiceStopBtn')?.addEventListener('click', stopVoiceSession);
   $('voiceMuteBtn')?.addEventListener('click', toggleMute);
+  $('appearanceBtn')?.addEventListener('click', () => openSettingsSection('appearance'));
   $('engineBadge')?.addEventListener('click', () => openSettingsSection('engine'));
   $('closeModalBtn')?.addEventListener('click', closeModal);
   $('closeVideoBtn')?.addEventListener('click', closeVideo);
   $('modalBackdrop')?.addEventListener('click', e => { if (e.target === $('modalBackdrop')) closeModal(); });
-  
+
   document.querySelectorAll('#settingsPanel .setting-btn').forEach(btn => {
     btn.addEventListener('click', () => openSettingsSection(btn.dataset.section));
   });
-  
+
   $('floatingAssistant')?.addEventListener('click', () => { if (!bubbleDrag) toggleMute(); bubbleDrag = false; });
   $('floatingAssistant')?.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMute(); } });
-  
+
   initPointerDrag($('floatingAssistant'), 'bubble');
   initPointerDrag($('videoPlayer'), 'video');
-  
+
   document.addEventListener('click', e => {
     const sideMenu = $('sideMenu');
     const settingsPanel = $('settingsPanel');
@@ -290,7 +285,7 @@ function setMode(mode) {
 
 function updateMuteUI() {
   $('muteIndicator').style.display = state.voiceMuted ? 'block' : 'none';
-  $('voiceMuteBtn').textContent = state.voiceMuted ? '' : '🔊';
+  $('voiceMuteBtn').textContent = state.voiceMuted ? '🔇' : '🔊';
   const bubble = $('floatingAssistant');
   if (bubble) bubble.setAttribute('aria-pressed', String(state.voiceMuted));
 }
@@ -301,6 +296,7 @@ function toggleMute() {
   updateMuteUI();
   if (state.voiceMuted) {
     if ('speechSynthesis' in window) speechSynthesis.cancel();
+    if (kokoroPlayer) { try { kokoroPlayer.pause(); } catch (e) {} kokoroPlayer = null; }
     speaking = false;
     voiceBusy = false;
     stopRecognitionOnly();
@@ -393,7 +389,7 @@ async function sendMessage() {
           saveState();
           renderMessages();
         } else {
-          addMessage(chat, 'assistant', state.youtubeKey ? 'No encontré videos para esa sugerencia.' : ' Para buscar videos necesito tu YouTube API Key. Ve a Ajustes → API Keys.');
+          addMessage(chat, 'assistant', state.youtubeKey ? 'No encontré videos para esa sugerencia.' : '🔑 Para buscar videos necesito tu YouTube API Key. Ve a Ajustes → API Keys.');
           saveState();
           renderMessages();
         }
@@ -478,7 +474,10 @@ function getPersonalityPrompt(personality, nombre) {
 
 function buildPrompt(chat) {
   const nombre = state.name || 'Usuario';
-  let prompt = getPersonalityPrompt(state.personality || 'JARVIS', nombre) + `
+  const memoriaBlock = state.memoria.length
+    ? '\nLO QUE YA SABES DE ' + nombre.toUpperCase() + ' (de conversaciones anteriores, cualquier chat — trátalo como si siempre lo hubieras sabido, nunca lo menciones como algo que "recuperaste" o "leíste"):\n' + state.memoria.map(m => '- ' + m).join('\n') + '\n'
+    : '';
+  let prompt = getPersonalityPrompt(state.personality || 'JARVIS', nombre) + memoriaBlock + `
 CÓMO RESPONDES SEGÚN LO QUE SIENTE ${nombre}:
 Si está triste: escuchas primero. No saltas a "arreglar" el problema antes de que la persona termine de expresarlo.
 Si está feliz: compartes la alegría genuinamente, sin bajarle el entusiasmo.
@@ -596,7 +595,7 @@ function readableError(error) {
     const detail = parts.slice(3).join(' ').trim();
     const label = PROVIDERS[providerId]?.label || providerId;
     if (status === '401') return '🔐 ' + label + ' Key inválida.';
-    if (status === '429') return ' Límite de ' + label + ' alcanzado.';
+    if (status === '429') return '⏳ Límite de ' + label + ' alcanzado.';
     return '⚠️ Error de ' + label + ': ' + (detail || 'sin detalle');
   }
   if (message === 'NETWORK_OFFLINE') return '⚠️ No hay conexión con Internet.';
@@ -657,85 +656,104 @@ function configureVoices() {
 
 if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = configureVoices;
 
-// --- KOKORO TTS CON BARRA DE PROGRESO ---
-async function initKokoro(progressCallback) {
-  if (kokoroTTS || kokoroLoading) return;
+// --- KOKORO TTS (corregido: from_pretrained + voces reales + progreso real) ---
+function kokoroBarHTML() {
+  return '<div class="kokoro-download-bar"><div class="download-title"><div class="spinner"></div><span id="kokoroStatusText">Preparando descarga...</span></div><div class="progress-track"><div class="progress-fill" id="kokoroProgressFill"></div></div><div class="progress-text" id="kokoroProgressText">0%</div><div class="progress-status" id="kokoroStatusSub">Conectando al servidor...</div></div>';
+}
+
+function paintKokoroBar(pct, statusText) {
+  const fill = $('kokoroProgressFill');
+  const text = $('kokoroProgressText');
+  const sub = $('kokoroStatusSub');
+  if (fill) fill.style.width = pct + '%';
+  if (text) text.textContent = pct + '%';
+  if (sub && statusText) sub.textContent = statusText;
+}
+
+function showKokoroReady() {
+  const cont = $('kokoroProgressContainer');
+  if (cont) cont.innerHTML = '<div class="kokoro-ready">✅ Kokoro listo — voz neuronal activa</div>';
+}
+
+function showKokoroError(msg) {
+  const cont = $('kokoroProgressContainer');
+  if (cont) cont.innerHTML = '<div class="kokoro-error">⚠️ ' + escapeHTML(msg || 'Error al cargar Kokoro.') + '</div>';
+}
+
+function kokoroProgress(info) {
+  if (!info || !info.status) return;
+  if (info.status === 'progress' && info.total) {
+    kokoroProgressMap[info.name || 'modelo'] = { loaded: info.loaded || 0, total: info.total };
+    let loaded = 0, total = 0;
+    Object.values(kokoroProgressMap).forEach(f => { loaded += f.loaded; total += f.total; });
+    const pct = total ? Math.min(99, Math.floor((loaded / total) * 100)) : 5;
+    paintKokoroBar(pct, 'Descargando modelo de voz...');
+  } else if (info.status === 'ready') {
+    paintKokoroBar(100, '¡Listo!');
+  }
+}
+
+async function initKokoro() {
+  if (kokoroTTS) return kokoroTTS;
+  if (kokoroLoading) return null;
   kokoroLoading = true;
-  
+  kokoroProgressMap = {};
+  paintKokoroBar(2, 'Conectando al servidor...');
   try {
-    let progress = 0;
-    const progressInterval = setInterval(() => {
-      progress += Math.random() * 15;
-      if (progress > 90) progress = 90;
-      if (progressCallback) progressCallback(Math.floor(progress), 'Descargando modelo de voz...');
-    }, 300);
-    
-    const module = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.1.0/+esm');
-    const KokoroTTS = module.KokoroTTS || module.default;
-    
-    clearInterval(progressInterval);
-    if (progressCallback) progressCallback(95, 'Inicializando modelo...');
-    
-    kokoroTTS = await KokoroTTS.fromPretrained({
-      model: 'kokoro-v1.0',
-      dtype: 'q8'
+    const mod = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.1.0/+esm');
+    const tts = await mod.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
+      dtype: 'q8',
+      progress_callback: kokoroProgress
     });
-    
-    if (progressCallback) progressCallback(100, '¡Listo!');
+    kokoroTTS = tts;
     kokoroLoaded = true;
-    
-    setTimeout(() => {
-      if (progressCallback) progressCallback(-1, '');
-    }, 1500);
-    
-  } catch (error) {
-    console.error('Error cargando Kokoro:', error);
-    if (progressCallback) progressCallback(-2, 'Error al cargar');
-    kokoroLoading = false;
+    paintKokoroBar(100, '¡Listo!');
+    setTimeout(showKokoroReady, 600);
+    return tts;
+  } catch (err) {
+    console.error('Kokoro:', err);
+    showKokoroError('Error al cargar Kokoro. Revisa tu conexión y vuelve a intentarlo.');
+    return null;
   } finally {
     kokoroLoading = false;
   }
 }
 
-async function speakWithKokoro(text) {
-  if (!kokoroTTS) {
-    await initKokoro();
-    if (!kokoroTTS) return;
-  }
-  const voice = KOKORO_VOICES.find(v => v.id === state.kokoroVoice) || KOKORO_VOICES[0];
+async function speakWithKokoro(text, done) {
+  const tts = kokoroTTS || await initKokoro();
+  if (!tts) { if (done) done(); return; }
+  const voiceId = state.kokoroVoice || 'af_heart';
+  const clean = String(text).replace(/[*_#`>]/g, '').slice(0, CONFIG.maxSpeechChars);
   try {
-    const cleanText = String(text).replace(/[*_#`]/g, '');
-    const audio = await kokoroTTS.generate(cleanText, {
-      voice: voice.id,
-      speed: state.voiceRate
-    });
     speaking = true;
     setBubbleSpeaking();
-    await audio.play();
+    if (voiceSession) { $('voiceOrb')?.classList.remove('listening', 'thinking'); $('voiceOrb')?.classList.add('speaking'); }
+    const audio = await tts.generate(clean, { voice: voiceId, speed: Number(state.voiceRate) || 1 });
+    const blob = audio.toBlob();
+    const url = URL.createObjectURL(blob);
+    kokoroPlayer = new Audio(url);
+    kokoroPlayer.onended = kokoroPlayer.onerror = () => {
+      URL.revokeObjectURL(url);
+      speaking = false;
+      setBubbleIdle();
+      $('voiceOrb')?.classList.remove('speaking');
+      kokoroPlayer = null;
+      if (done) done();
+    };
+    await kokoroPlayer.play();
+  } catch (err) {
+    console.error('Kokoro play:', err);
     speaking = false;
     setBubbleIdle();
-  } catch (error) {
-    console.error('Error reproduciendo con Kokoro:', error);
-    speaking = false;
-    setBubbleIdle();
+    $('voiceOrb')?.classList.remove('speaking');
+    if (done) done();
   }
 }
 
 function speak(text, done) {
-  if (!state.voiceEnabled || state.voiceMuted) { 
-    setBubbleIdle(); 
-    if (done) done(); 
-    return; 
-  }
-  if (state.voiceEngine === 'kokoro') {
-    speakWithKokoro(text).then(() => { if (done) done(); });
-    return;
-  }
-  if (!('speechSynthesis' in window)) { 
-    setBubbleIdle(); 
-    if (done) done(); 
-    return; 
-  }
+  if (!state.voiceEnabled || state.voiceMuted) { setBubbleIdle(); if (done) done(); return; }
+  if (state.voiceEngine === 'kokoro') { speakWithKokoro(text, done); return; }
+  if (!('speechSynthesis' in window)) { setBubbleIdle(); if (done) done(); return; }
   const cleanText = String(text).replace(/[*_#`]/g, '');
   const chunks = cleanText.match(new RegExp('.{1,' + CONFIG.maxSpeechChars + '}', 'g')) || [cleanText];
   speakQueue = chunks;
@@ -794,7 +812,7 @@ function dictate() {
   try {
     recognition.start();
   } catch (error) {
-    if (error.name !== 'InvalidStateError') toast('️ Error al iniciar dictado');
+    if (error.name !== 'InvalidStateError') toast('⚠️ Error al iniciar dictado');
   }
 }
 
@@ -807,7 +825,7 @@ function toggleVoiceSession() { if (voiceSession) stopVoiceSession(); else start
 
 function startVoiceSession() {
   if (!SpeechRecognitionAPI) return toast('⚠️ Reconocimiento de voz no soportado');
-  if (state.voiceMuted) return toast(' Activa la voz primero');
+  if (state.voiceMuted) return toast('🔇 Activa la voz primero');
   voiceSession = true;
   voiceBusy = false;
   $('voiceTalkBtn')?.classList.add('active');
@@ -896,6 +914,7 @@ function stopVoiceSession() {
   voiceBusy = false;
   speakQueue = [];
   isSpeakingQueue = false;
+  if (kokoroPlayer) { try { kokoroPlayer.pause(); } catch (e) {} kokoroPlayer = null; }
   try { voiceRecognition?.stop(); } catch (error) {}
   voiceRecognition = null;
   if ('speechSynthesis' in window) speechSynthesis.cancel();
@@ -1022,7 +1041,7 @@ async function searchYouTube(query) {
     if (!data.items?.length) return null;
     const links = data.items.map(i => 'https://www.youtube.com/watch?v=' + i.id.videoId);
     const itemsFull = data.items.map((i, x) => ({ title: i.snippet.title, channel: i.snippet.channelTitle, url: links[x] }));
-    const text = data.items.map((i, x) => (x + 1) + '. ' + i.snippet.title + '\n ' + i.snippet.channelTitle + '\n📺 ' + links[x]).join('\n\n');
+    const text = data.items.map((i, x) => (x + 1) + '. ' + i.snippet.title + '\n👤 ' + i.snippet.channelTitle + '\n📺 ' + links[x]).join('\n\n');
     return { links, items: itemsFull, text: '🎬 Resultados:\n\n' + text + '\n\n_Di 1, 2 o 3 para reproducir._' };
   } catch (error) {
     console.error('YouTube search error:', error);
@@ -1145,13 +1164,14 @@ function renderMessages() {
     wrapper.className = 'message ' + m.role;
     const content = document.createElement('div');
     content.className = 'message-content';
-    
-    if (m.role === 'assistant' || m.role === 'system') {
-      content.innerHTML = marked.parse(m.content);
+
+    if ((m.role === 'assistant' || m.role === 'system') && window.marked) {
+      try { content.innerHTML = window.marked.parse(m.content); }
+      catch (err) { content.innerHTML = escapeHTML(m.content).replace(/\n/g, '<br>'); }
     } else {
       content.innerHTML = escapeHTML(m.content).replace(/\n/g, '<br>');
     }
-    
+
     wrapper.appendChild(content);
     if (m.role === 'assistant' && lastYtResultsFull.length > 0 && m.content.includes('🎬 Resultados')) {
       const btnContainer = document.createElement('div');
@@ -1190,12 +1210,12 @@ function openLibrary() {
   const files = chat.archivos || [];
   let html = '<h3>📚 Biblioteca</h3><p>' + files.length + '/' + CONFIG.maxFilesPerChat + ' archivo(s)</p>';
   if (!files.length) html += '<p style="color:#888">🛫 No hay archivos.</p>';
-  files.forEach((file, index) => { html += '<div class="file"><span>📄 ' + escapeHTML(file.nombre) + '</span><button class="danger" onclick="removeFile(' + index + ')">️</button></div>'; });
+  files.forEach((file, index) => { html += '<div class="file"><span>📄 ' + escapeHTML(file.nombre) + '</span><button class="danger" onclick="removeFile(' + index + ')">🗑️</button></div>'; });
   html += '<button class="modalBtn" onclick="pickFiles()">📂 Agregar archivos</button>';
   if (files.length >= CONFIG.maxFilesPerChat) {
     html += '<p style="color:#888;font-size:12px;margin-top:8px">⚠️ Límite de ' + CONFIG.maxFilesPerChat + ' archivos alcanzado.</p>';
   }
-  modal(' Biblioteca', html);
+  modal('📚 Biblioteca', html);
 }
 
 function pickFiles() {
@@ -1251,52 +1271,38 @@ function openSettingsSection(section) {
   let title = '', content = '';
   if (section === 'profile') {
     title = '👤 Perfil';
-    content = '<div class="form"><label>Nombre</label><input id="cfgName" value="' + escapeAttribute(state.name) + '"></div><div class="form"><label>Personalidad</label><select id="cfgPersonality"><option value="JARVIS"' + (state.personality === 'JARVIS' ? ' selected' : '') + '>JARVIS </option><option value="Amigable"' + (state.personality === 'Amigable' ? ' selected' : '') + '>Amigable 😊</option><option value="Formal"' + (state.personality === 'Formal' ? ' selected' : '') + '>Formal 🎩</option></select></div><button class="modalBtn" onclick="saveProfile()">💾 Guardar</button>';
+    content = '<div class="form"><label>Nombre</label><input id="cfgName" value="' + escapeAttribute(state.name) + '"></div><div class="form"><label>Personalidad</label><select id="cfgPersonality"><option value="JARVIS"' + (state.personality === 'JARVIS' ? ' selected' : '') + '>JARVIS 🔥</option><option value="Amigable"' + (state.personality === 'Amigable' ? ' selected' : '') + '>Amigable 😊</option><option value="Formal"' + (state.personality === 'Formal' ? ' selected' : '') + '>Formal 🎩</option></select></div><button class="modalBtn" onclick="saveProfile()">💾 Guardar</button>';
   } else if (section === 'voice') {
     title = '🎙️ Estilo de Voz';
-    content = `
-      <div class="voice-engine-selector">
-        <label>Motor de Voz</label>
-        <div class="engine-options">
-          <div class="engine-option-voice ${state.voiceEngine === 'browser' ? 'active' : ''}" onclick="setVoiceEngine('browser')">
-            <div class="engine-icon">🌐</div>
-            <div class="engine-name">Navegador</div>
-            <div class="engine-desc">Rápido, sin descarga</div>
-          </div>
-          <div class="engine-option-voice ${state.voiceEngine === 'kokoro' ? 'active' : ''}" onclick="setVoiceEngine('kokoro')">
-            <div class="engine-icon"></div>
-            <div class="engine-name">Kokoro</div>
-            <div class="engine-desc">${KOKORO_VOICES.length} voces naturales</div>
-          </div>
-        </div>
-      </div>
-      
-      <div id="kokoroProgressContainer"></div>
-      
-      <label>Selecciona una voz:</label>
-      <div class="voice-selector-grid">
-        ${KOKORO_VOICES.map(voice => `
-          <div class="voice-option ${state.kokoroVoice === voice.id ? 'selected' : ''}" onclick="selectKokoroVoice('${voice.id}')">
-            <span class="voice-gender">${voice.gender}</span>
-            <div class="voice-icon">${voice.icon}</div>
-            <div class="voice-name">${voice.name}</div>
-            <div class="voice-lang">${voice.lang}</div>
-            <button class="voice-preview-btn" onclick="event.stopPropagation(); previewVoice('${voice.id}')"> Probar</button>
-          </div>
-        `).join('')}
-      </div>
-      
-      <div class="form">
-        <label>Velocidad: <span id="rateLabel">${state.voiceRate}</span>x</label>
-        <input id="cfgRate" type="range" min=".5" max="2" step=".1" value="${state.voiceRate}" oninput="document.getElementById('rateLabel').textContent=this.value">
-      </div>
-      
-      <button class="modalBtn" onclick="saveVoiceSettings()">💾 Guardar</button>
-      <button class="modalBtn" onclick="testCurrentVoice()">🔊 Probar Voz Actual</button>
-    `;
+    const kokoroActive = state.voiceEngine === 'kokoro';
+    content =
+      '<div class="voice-engine-selector"><label>Motor de voz</label><div class="engine-options">' +
+      '<div class="engine-option-voice' + (kokoroActive ? '' : ' active') + '" onclick="setVoiceEngine(\'browser\')"><div class="engine-icon">🌐</div><div class="engine-name">Navegador</div><div class="engine-desc">Rápido, sin descarga</div></div>' +
+      '<div class="engine-option-voice' + (kokoroActive ? ' active' : '') + '" onclick="setVoiceEngine(\'kokoro\')"><div class="engine-icon">🎭</div><div class="engine-name">Kokoro</div><div class="engine-desc">Voz neuronal natural</div></div>' +
+      '</div></div>' +
+      '<div id="kokoroProgressContainer">' +
+        (kokoroLoaded ? '<div class="kokoro-ready">✅ Kokoro listo — voz neuronal activa</div>' : (kokoroLoading ? kokoroBarHTML() : '')) +
+      '</div>' +
+      '<label style="display:block;margin:10px 0 8px;color:var(--text-soft);font-size:12px;font-weight:600">Voces Kokoro (toca para elegir):</label>' +
+      '<div class="voice-selector-grid">' +
+      KOKORO_VOICES.map(v =>
+        '<div class="voice-option' + (state.kokoroVoice === v.id ? ' selected' : '') + '" onclick="selectKokoroVoice(\'' + v.id + '\')">' +
+        '<span class="voice-gender">' + v.gender + '</span>' +
+        '<div class="voice-icon">' + v.icon + '</div>' +
+        '<div class="voice-name">' + v.name + '</div>' +
+        '<div class="voice-lang">' + v.lang + '</div>' +
+        '<button class="voice-preview-btn" onclick="event.stopPropagation();previewVoice(\'' + v.id + '\')">🔊 Probar</button>' +
+        '</div>'
+      ).join('') +
+      '</div>' +
+      '<div class="form"><label>Velocidad: <span id="rateLabel">' + state.voiceRate + '</span>x</label><input id="cfgRate" type="range" min=".5" max="2" step=".1" value="' + state.voiceRate + '" oninput="document.getElementById(\'rateLabel\').textContent=this.value"></div>' +
+      '<div class="form"><label>Tono</label><input id="cfgPitch" type="range" min=".5" max="1.5" step=".05" value="' + state.voicePitch + '"></div>' +
+      '<label><input id="cfgVoiceEnabled" type="checkbox"' + (state.voiceEnabled ? ' checked' : '') + '> Voz activa</label>' +
+      '<button class="modalBtn" onclick="saveVoice()">💾 Guardar</button>' +
+      '<button class="modalBtn" onclick="testVoice()">🔊 Probar</button>';
   } else if (section === 'appearance') {
     title = '🎨 Temas';
-    content = '<div class="form"><label>Tema</label><select id="cfgTheme"><option value="dark"' + (state.theme === 'dark' ? ' selected' : '') + '>Oscuro </option><option value="light"' + (state.theme === 'light' ? ' selected' : '') + '>Claro ☀️</option></select></div><div class="form"><label>Fondo</label><input id="cfgBg" value="' + escapeAttribute(state.fondo || '') + '" placeholder="URL"><button class="inlineFile" onclick="document.getElementById(\'bgFile\').click()">📁 Imagen</button><input id="bgFile" type="file" accept="image/*" hidden onchange="loadBackgroundFile(event)"></div><button class="modalBtn" onclick="saveAppearance()">💾 Guardar</button><button class="danger" onclick="clearBackground()">🗑️ Quitar fondo</button>';
+    content = '<div class="form"><label>Tema</label><select id="cfgTheme"><option value="dark"' + (state.theme === 'dark' ? ' selected' : '') + '>Oscuro 🌙</option><option value="light"' + (state.theme === 'light' ? ' selected' : '') + '>Claro ☀️</option></select></div><div class="form"><label>Fondo</label><input id="cfgBg" value="' + escapeAttribute(state.fondo || '') + '" placeholder="URL"><button class="inlineFile" onclick="document.getElementById(\'bgFile\').click()">📁 Imagen</button><input id="bgFile" type="file" accept="image/*" hidden onchange="loadBackgroundFile(event)"></div><button class="modalBtn" onclick="saveAppearance()">💾 Guardar</button><button class="danger" onclick="clearBackground()">🗑️ Quitar fondo</button>';
   } else if (section === 'bubble') {
     title = '🫧 Burbuja';
     content = '<label><input id="cfgBubbleEnabled" type="checkbox"' + (state.bubbleEnabled ? ' checked' : '') + '> Mostrar burbuja</label><button class="modalBtn" onclick="openBubbleGifPicker()">🎞️ Seleccionar GIF</button><button class="modalBtn" onclick="saveBubble()">💾 Guardar</button><button class="danger" onclick="resetBubble()">🔄 Restaurar</button>';
@@ -1308,7 +1314,7 @@ function openSettingsSection(section) {
       : '<p style="opacity:.5;font-size:12.5px">Aún no hay nada guardado.</p>')
     + (state.memoria.length ? '<button class="danger" style="margin-top:12px" onclick="clearMemory()">🗑️ Olvidar todo</button>' : '');
   } else if (section === 'engine') {
-    title = ' Motor IA';
+    title = '🧠 Motor IA';
     content = '<div class="engine-option' + (state.engine === 'offline' ? ' active' : '') + '" onclick="setEngine(\'offline\')"><strong>🏠 Offline — llama.cpp</strong><small>IA local sin Internet. Requiere llama.cpp en 127.0.0.1:8080 con CORS habilitado.</small></div>'
     + '<div style="margin:14px 0 6px;opacity:.65;font-size:13px">🌐 Online — elige tu motor:</div>'
     + Object.keys(PROVIDERS).map(id => {
@@ -1330,100 +1336,50 @@ function openSettingsSection(section) {
     content = '<button class="modalBtn" onclick="exportData()">📤 Exportar</button><button class="modalBtn" onclick="importData()">📥 Importar</button><button class="danger" onclick="clearAllData()">🗑️ Borrar todo</button>';
   } else {
     title = 'ℹ️ Acerca';
-    content = '<p style="text-align:center">🔥 <strong>Aipher v' + CONFIG.version + '</strong><br>Asistente personal con IA<br>🌐 Groq · 🏠 llama.cpp · 📺 YouTube · 🎭 Kokoro TTS<br><br><small>Las API keys se almacenan localmente en tu navegador.</small></p>';
+    content = '<p style="text-align:center">🔥 <strong>Aipher v' + CONFIG.version + '</strong><br>Asistente personal con IA<br>🌐 Groq · 🏠 llama.cpp · 📺 YouTube ·  Kokoro TTS<br><br><small>Las API keys se almacenan localmente en tu navegador.</small></p>';
   }
   modal(title, content);
   renderLogoSystem();
-  
-  if (section === 'voice' && kokoroLoaded) {
-    const container = $('kokoroProgressContainer');
-    if (container) {
-      container.innerHTML = '<div class="kokoro-ready">✅ Kokoro listo — 17 voces disponibles</div>';
-    }
-  }
 }
 
 function setVoiceEngine(engine) {
-  state.voiceEngine = engine;
+  state.voiceEngine = (engine === 'kokoro') ? 'kokoro' : 'browser';
   saveState();
   openSettingsSection('voice');
-  if (engine === 'kokoro' && !kokoroLoaded) {
-    const container = $('kokoroProgressContainer');
-    if (container) {
-      container.innerHTML = `
-        <div class="kokoro-download-bar">
-          <div class="download-title">
-            <div class="spinner"></div>
-            <span id="kokoroStatusText">Preparando descarga...</span>
-          </div>
-          <div class="progress-track">
-            <div class="progress-fill" id="kokoroProgressFill"></div>
-          </div>
-          <div class="progress-text" id="kokoroProgressText">0%</div>
-          <div class="progress-status" id="kokoroStatusSub">Conectando al servidor...</div>
-        </div>
-      `;
-    }
-    initKokoro((progress, status) => {
-      if (progress === -1) {
-        const cont = $('kokoroProgressContainer');
-        if (cont) cont.innerHTML = '<div class="kokoro-ready">✅ Kokoro listo — 17 voces disponibles</div>';
-        return;
-      }
-      if (progress === -2) {
-        const cont = $('kokoroProgressContainer');
-        if (cont) cont.innerHTML = '<div style="padding:12px;border-radius:10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ff7f7f;font-size:13px;margin:15px 0">️ Error al cargar Kokoro. Revisa tu conexión.</div>';
-        return;
-      }
-      const fill = $('kokoroProgressFill');
-      const text = $('kokoroProgressText');
-      const statusText = $('kokoroStatusText');
-      const statusSub = $('kokoroStatusSub');
-      if (fill) fill.style.width = progress + '%';
-      if (text) text.textContent = progress + '%';
-      if (statusText) statusText.textContent = status;
-      if (statusSub && progress < 50) statusSub.textContent = 'Descargando modelo (~300MB)...';
-      else if (statusSub && progress < 90) statusSub.textContent = 'Procesando...';
-      else if (statusSub) statusSub.textContent = 'Casi listo...';
-    });
+  if (state.voiceEngine === 'kokoro' && !kokoroTTS && !kokoroLoading) {
+    const cont = $('kokoroProgressContainer');
+    if (cont) cont.innerHTML = kokoroBarHTML();
+    initKokoro();
   }
 }
 
 function selectKokoroVoice(voiceId) {
   state.kokoroVoice = voiceId;
+  if (state.voiceEngine !== 'kokoro') state.voiceEngine = 'kokoro';
   saveState();
   openSettingsSection('voice');
+  if (!kokoroTTS && !kokoroLoading) {
+    const cont = $('kokoroProgressContainer');
+    if (cont) cont.innerHTML = kokoroBarHTML();
+    initKokoro();
+  }
 }
 
 async function previewVoice(voiceId) {
-  if (!kokoroTTS) {
-    toast('⏳ Kokoro aún se está cargando...');
-    await initKokoro();
-    if (!kokoroTTS) return;
-  }
-  const voice = KOKORO_VOICES.find(v => v.id === voiceId);
-  const text = 'Hola, soy ' + voice.name + '. Esta es una prueba de voz.';
+  const tts = kokoroTTS || await initKokoro();
+  if (!tts) return;
+  const v = KOKORO_VOICES.find(x => x.id === voiceId);
   try {
-    const audio = await kokoroTTS.generate(text, { voice: voiceId, speed: 1 });
-    await audio.play();
-  } catch (error) { 
-    console.error('Error preview:', error);
+    if (kokoroPlayer) { try { kokoroPlayer.pause(); } catch (e) {} kokoroPlayer = null; }
+    const audio = await tts.generate('Hola, soy ' + (v ? v.name : 'Aipher') + '. Así suena mi voz.', { voice: voiceId, speed: 1 });
+    const blob = audio.toBlob();
+    const url = URL.createObjectURL(blob);
+    kokoroPlayer = new Audio(url);
+    kokoroPlayer.onended = () => { URL.revokeObjectURL(url); kokoroPlayer = null; };
+    await kokoroPlayer.play();
+  } catch (err) {
+    console.error('Preview:', err);
     toast('⚠️ Error al reproducir');
-  }
-}
-
-function saveVoiceSettings() {
-  state.voiceRate = Number($('cfgRate')?.value) || 1;
-  saveState();
-  closeModal();
-  toast('✅ Configuración guardada');
-}
-
-async function testCurrentVoice() {
-  if (state.voiceEngine === 'kokoro') {
-    await previewVoice(state.kokoroVoice);
-  } else {
-    speak('Hola, soy Aipher. Esta es una prueba de voz.');
   }
 }
 
@@ -1438,14 +1394,14 @@ function closeModal() { $('modalBackdrop')?.classList.add('hidden'); }
 
 function saveProfile() { state.name = $('cfgName')?.value.trim() || 'Usuario'; state.personality = $('cfgPersonality')?.value || 'JARVIS'; saveState(); renderMessages(); closeModal(); toast('✅ Guardado'); }
 function saveVoice() { state.voiceRate = Number($('cfgRate')?.value) || 1; state.voicePitch = Number($('cfgPitch')?.value) || 1; state.voiceEnabled = Boolean($('cfgVoiceEnabled')?.checked); configureVoices(); saveState(); closeModal(); toast('✅ Guardado'); }
-function testVoice() { try { speak('Hola, soy Aipher.'); } catch (e) { toast('️ No hay voces disponibles en este dispositivo'); } }
+function testVoice() { try { speak('Hola, soy Aipher.'); } catch (e) { toast('⚠️ No hay voces disponibles en este dispositivo'); } }
 function saveAppearance() { state.theme = $('cfgTheme')?.value || 'dark'; state.fondo = $('cfgBg')?.value.trim() || ''; saveState(); applyTheme(); applyBackground(); closeModal(); toast('✅ Guardado'); }
 function clearBackground() { state.fondo = ''; saveState(); applyBackground(); closeModal(); toast('🗑️ Quitado'); }
 
 function loadBackgroundFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  if (file.size > CONFIG.maxFileSize) { toast('️ Imagen muy grande (máx 10MB)'); return; }
+  if (file.size > CONFIG.maxFileSize) { toast('⚠️ Imagen muy grande (máx 10MB)'); return; }
   const reader = new FileReader();
   reader.onload = e => {
     state.fondo = e.target.result;
@@ -1598,7 +1554,7 @@ function registerServiceWorker() {
           const newWorker = reg.installing;
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              toast(' Nueva versión disponible. Recarga para actualizar.');
+              toast('🔄 Nueva versión disponible. Recarga para actualizar.');
             }
           });
         });
@@ -1668,6 +1624,5 @@ Object.assign(window, {
   removeFile, pickFiles, saveProfile, saveVoice, testVoice, saveAppearance,
   clearBackground, loadBackgroundFile, saveBubble, resetBubble, openBubbleGifPicker,
   saveAPI, exportData, importData, clearAllData, setEngine, setOnlineProvider,
-  forgetMemory, clearMemory, setVoiceEngine, selectKokoroVoice, previewVoice,
-  saveVoiceSettings, testCurrentVoice
+  forgetMemory, clearMemory, setVoiceEngine, selectKokoroVoice, previewVoice
 });
