@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aipher-v4.5.1';
+const CACHE_NAME = 'aipher-v4.6.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -39,19 +39,16 @@ self.addEventListener('message', event => {
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-
   if (url.hostname === 'api.groq.com' ||
       url.hostname === 'www.googleapis.com' ||
       url.hostname === '127.0.0.1' ||
       url.hostname === 'localhost') {
     return;
   }
-
   event.respondWith(
     caches.match(event.request)
       .then(cachedResponse => {
         if (cachedResponse) return cachedResponse;
-
         return fetch(event.request)
           .then(response => {
             if (response.ok && event.request.method === 'GET') {
@@ -59,7 +56,6 @@ self.addEventListener('fetch', event => {
               caches.open(CACHE_NAME)
                 .then(cache => {
                   cache.put(event.request, responseClone);
-                  // Limitar tamaño del cache
                   cache.keys().then(keys => {
                     if (keys.length > 150) {
                       cache.delete(keys[0]);
