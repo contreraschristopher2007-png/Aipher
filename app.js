@@ -1,6 +1,6 @@
 'use strict';
 const CONFIG = {
-  version: '4.7.0',
+  version: '4.7.1',
   offlineURL: 'http://127.0.0.1:8080/v1/chat/completions',
   healthURL: 'http://127.0.0.1:8080/health',
   youtubeURL: 'https://www.googleapis.com/youtube/v3/search',
@@ -21,6 +21,8 @@ const PROVIDERS = {
 };
 
 const KOKORO_VOICES = [
+  { id: 'ef_dora', name: 'Dora (Español)', lang: 'es', gender: '👩', icon: '🗣️' },
+  { id: 'em_alex', name: 'Alex (Español)', lang: 'es', gender: '👨', icon: '🗣️' },
   { id: 'af_heart', name: 'Heart', lang: 'en-US', gender: '👩', icon: '❤️' },
   { id: 'af_bella', name: 'Bella', lang: 'en-US', gender: '👩', icon: '🎵' },
   { id: 'af_nicole', name: 'Nicole', lang: 'en-US', gender: '👩', icon: '🎙️' },
@@ -33,16 +35,16 @@ const KOKORO_VOICES = [
   { id: 'am_onyx', name: 'Onyx', lang: 'en-US', gender: '👨', icon: '⚫' },
   { id: 'bf_emma', name: 'Emma', lang: 'en-GB', gender: '👩', icon: '🇬🇧' },
   { id: 'bf_isabella', name: 'Isabella', lang: 'en-GB', gender: '👩', icon: '🎭' },
-  { id: 'bm_george', name: 'George', lang: 'en-GB', gender: '👨', icon: '🇬🇧' },
+  { id: 'bm_george', name: 'George', lang: 'en-GB', gender: '👨', icon: '🇬' },
   { id: 'bm_lewis', name: 'Lewis', lang: 'en-GB', gender: '👨', icon: '🎩' }
 ];
 
 const PIPER_VOICES = [
   { id: 'es_ES-davefx-medium', name: 'Dave (España)', lang: 'es-ES', gender: '👨', icon: '🇪🇸' },
-  { id: 'es_ES-mls_9972-low', name: 'Carmen (España)', lang: 'es-ES', gender: '👩', icon: '🇪' },
-  { id: 'es_ES-mls_10246-low', name: 'Lucía (España)', lang: 'es-ES', gender: '👩', icon: '🇪' },
+  { id: 'es_ES-mls_9972-low', name: 'Carmen (España)', lang: 'es-ES', gender: '👩', icon: '🇪🇸' },
+  { id: 'es_ES-mls_10246-low', name: 'Lucía (España)', lang: 'es-ES', gender: '👩', icon: '🇪🇸' },
   { id: 'es_ES-sharvard-medium', name: 'Sharvard (España)', lang: 'es-ES', gender: '👨', icon: '🇪🇸' },
-  { id: 'es_MX-ald-medium', name: 'Ald (México)', lang: 'es-MX', gender: '👨', icon: '🇲' },
+  { id: 'es_MX-ald-medium', name: 'Ald (México)', lang: 'es-MX', gender: '👨', icon: '🇲🇽' },
   { id: 'es_MX-claude-high', name: 'Claude (México)', lang: 'es-MX', gender: '👩', icon: '🇲🇽' },
   { id: 'es_AR-daniela-x_low', name: 'Daniela (Argentina)', lang: 'es-AR', gender: '👩', icon: '🇦🇷' },
   { id: 'es_CO-diana-x_low', name: 'Diana (Colombia)', lang: 'es-CO', gender: '👩', icon: '🇨🇴' }
@@ -58,7 +60,7 @@ const DEFAULT = {
   voiceEnabled: true,
   voiceMuted: false,
   voiceEngine: 'browser',
-  kokoroVoice: 'af_heart',
+  kokoroVoice: 'ef_dora',
   piperVoice: 'es_ES-davefx-medium',
   voiceRate: 1,
   voicePitch: 1,
@@ -678,7 +680,7 @@ function configureVoices() {
 
 if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = configureVoices;
 
-// --- BARRA DE PROGRESO TTS (compartida por Kokoro y Piper) ---
+// --- BARRA DE PROGRESO TTS ---
 function ttsBarHTML() {
   return '<div class="kokoro-download-bar"><div class="download-title"><div class="spinner"></div><span id="ttsStatusText">Preparando descarga...</span></div><div class="progress-track"><div class="progress-fill" id="ttsProgressFill"></div></div><div class="progress-text" id="ttsProgressText">0%</div><div class="progress-status" id="ttsStatusSub">Conectando al servidor...</div></div>';
 }
@@ -702,7 +704,7 @@ function showTTSError(msg) {
   if (cont) cont.innerHTML = '<div class="kokoro-error">⚠️ ' + escapeHTML(msg || 'Error al cargar la voz.') + '</div>';
 }
 
-// --- KOKORO (inglés) ---
+// --- KOKORO (español + inglés) ---
 function kokoroProgress(info) {
   if (!info || !info.status) return;
   if (info.status === 'progress' && info.total) {
@@ -710,7 +712,7 @@ function kokoroProgress(info) {
     let loaded = 0, total = 0;
     Object.values(kokoroProgressMap).forEach(f => { loaded += f.loaded; total += f.total; });
     const pct = total ? Math.min(99, Math.floor((loaded / total) * 100)) : 5;
-    paintTTSBar(pct, 'Descargando modelo inglés...');
+    paintTTSBar(pct, 'Descargando modelo de voz...');
   } else if (info.status === 'ready') {
     paintTTSBar(100, '¡Listo!');
   }
@@ -731,7 +733,7 @@ async function initKokoro() {
     kokoroTTS = tts;
     kokoroLoaded = true;
     paintTTSBar(100, '¡Listo!');
-    setTimeout(() => showTTSReady('Kokoro listo — voz inglesa activa'), 600);
+    setTimeout(() => showTTSReady('Kokoro listo — voces ES e EN'), 600);
     return tts;
   } catch (err) {
     console.error('Kokoro:', err);
@@ -745,7 +747,7 @@ async function initKokoro() {
 async function speakWithKokoro(text, done) {
   const tts = kokoroTTS || await initKokoro();
   if (!tts) { speakBrowser(text, done); return; }
-  const voiceId = state.kokoroVoice || 'af_heart';
+  const voiceId = state.kokoroVoice || 'ef_dora';
   const clean = String(text).replace(/[*_#`>]/g, '').slice(0, CONFIG.maxSpeechChars);
   try {
     speaking = true;
@@ -773,7 +775,7 @@ async function speakWithKokoro(text, done) {
   }
 }
 
-// --- PIPER (español) ---
+// --- PIPER (español regional) ---
 async function initPiper(voiceId) {
   if (piperClients[voiceId]) return piperClients[voiceId];
   if (piperLoading) return null;
@@ -1370,7 +1372,7 @@ function openSettingsSection(section) {
     const eng = state.voiceEngine;
     let readyHTML = '';
     if (eng === 'piper' && piperLoadedVoice) readyHTML = '<div class="kokoro-ready">✅ Voz española lista</div>';
-    if (eng === 'kokoro' && kokoroLoaded) readyHTML = '<div class="kokoro-ready">✅ Kokoro listo — voz inglesa</div>';
+    if (eng === 'kokoro' && kokoroLoaded) readyHTML = '<div class="kokoro-ready">✅ Kokoro listo — voces ES e EN</div>';
 
     let voicesHTML = '';
     if (eng === 'browser') {
@@ -1383,7 +1385,7 @@ function openSettingsSection(section) {
     } else {
       const list = (eng === 'piper') ? PIPER_VOICES : KOKORO_VOICES;
       const current = (eng === 'piper') ? state.piperVoice : state.kokoroVoice;
-      voicesHTML = '<label style="display:block;margin:10px 0 8px;color:var(--text-soft);font-size:12px;font-weight:600">Voces ' + (eng === 'piper' ? 'españolas' : 'inglesas') + ' (toca para elegir):</label>' +
+      voicesHTML = '<label style="display:block;margin:10px 0 8px;color:var(--text-soft);font-size:12px;font-weight:600">' + (eng === 'piper' ? 'Voces españolas regionales:' : 'Voces Kokoro (español e inglés):') + '</label>' +
         '<div class="voice-selector-grid">' +
         list.map(v =>
           '<div class="voice-option' + (current === v.id ? ' selected' : '') + '" onclick="selectTTSVoice(\'' + v.id + '\')">' +
@@ -1400,8 +1402,8 @@ function openSettingsSection(section) {
     content =
       '<div class="voice-engine-selector"><label>Motor de voz</label><div class="engine-options">' +
       '<div class="engine-option-voice' + (eng === 'browser' ? ' active' : '') + '" onclick="setVoiceEngine(\'browser\')"><div class="engine-icon">🌐</div><div class="engine-name">Navegador</div><div class="engine-desc">Rápida, sin descarga</div></div>' +
-      '<div class="engine-option-voice' + (eng === 'piper' ? ' active' : '') + '" onclick="setVoiceEngine(\'piper\')"><div class="engine-icon">🇪</div><div class="engine-name">Español</div><div class="engine-desc">Voz neuronal natural</div></div>' +
-      '<div class="engine-option-voice' + (eng === 'kokoro' ? ' active' : '') + '" onclick="setVoiceEngine(\'kokoro\')"><div class="engine-icon">🎭</div><div class="engine-name">Inglés</div><div class="engine-desc">Kokoro natural</div></div>' +
+      '<div class="engine-option-voice' + (eng === 'kokoro' ? ' active' : '') + '" onclick="setVoiceEngine(\'kokoro\')"><div class="engine-icon">🎭</div><div class="engine-name">Kokoro</div><div class="engine-desc">Voces ES + EN</div></div>' +
+      '<div class="engine-option-voice' + (eng === 'piper' ? ' active' : '') + '" onclick="setVoiceEngine(\'piper\')"><div class="engine-icon">🇪🇸</div><div class="engine-name">Piper</div><div class="engine-desc">Español regional</div></div>' +
       '</div></div>' +
       '<div id="ttsProgressContainer">' + readyHTML + '</div>' +
       voicesHTML +
@@ -1446,7 +1448,7 @@ function openSettingsSection(section) {
     content = '<button class="modalBtn" onclick="exportData()">📤 Exportar</button><button class="modalBtn" onclick="importData()">📥 Importar</button><button class="danger" onclick="clearAllData()">🗑️ Borrar todo</button>';
   } else {
     title = 'ℹ️ Acerca';
-    content = '<p style="text-align:center">🔥 <strong>Aipher v' + CONFIG.version + '</strong><br>Asistente personal con IA<br>🌐 Groq · 🏠 llama.cpp · 📺 YouTube · 🇸 Piper ·  Kokoro<br><br><small>Las API keys se almacenan localmente en tu navegador.</small></p>';
+    content = '<p style="text-align:center">🔥 <strong>Aipher v' + CONFIG.version + '</strong><br>Asistente personal con IA<br>🌐 Groq · 🏠 llama.cpp · 📺 YouTube ·  Kokoro ES/EN · 🇪🇸 Piper<br><br><small>Las API keys se almacenan localmente en tu navegador.</small></p>';
   }
   modal(title, content);
   renderLogoSystem();
@@ -1490,8 +1492,9 @@ async function previewTTSVoice(id) {
     const tts = kokoroTTS || await initKokoro();
     if (!tts) return;
     const v = KOKORO_VOICES.find(x => x.id === id);
+    const isSpanish = id.charAt(0) === 'e';
     try {
-      const audio = await tts.generate('Hi, I am ' + (v ? v.name : 'Aipher') + '. This is my English voice.', { voice: id, speed: 1 });
+      const audio = await tts.generate(isSpanish ? 'Hola, soy ' + (v ? v.name : 'Aipher') + '. Así sueno en español.' : 'Hi, I am ' + (v ? v.name : 'Aipher') + '. This is my voice.', { voice: id, speed: 1 });
       const blob = audio.toBlob();
       const url = URL.createObjectURL(blob);
       kokoroPlayer = new Audio(url);
