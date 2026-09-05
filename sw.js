@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aipher-v4.6.0';
+const CACHE_NAME = 'aipher-v4.6.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -42,7 +42,8 @@ self.addEventListener('fetch', event => {
   if (url.hostname === 'api.groq.com' ||
       url.hostname === 'www.googleapis.com' ||
       url.hostname === '127.0.0.1' ||
-      url.hostname === 'localhost') {
+      url.hostname === 'localhost' ||
+      url.hostname === 'cdn.jsdelivr.net') {
     return;
   }
   event.respondWith(

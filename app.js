@@ -1,6 +1,6 @@
 'use strict';
 const CONFIG = {
-  version: '4.6.0',
+  version: '4.6.1',
   offlineURL: 'http://127.0.0.1:8080/v1/chat/completions',
   healthURL: 'http://127.0.0.1:8080/health',
   youtubeURL: 'https://www.googleapis.com/youtube/v3/search',
@@ -20,26 +20,26 @@ const PROVIDERS = {
   groq: { 
     label: 'Groq', 
     url: 'https://api.groq.com/openai/v1/chat/completions', 
-    model: 'llama-3.3-70b-versatile',
+    model: 'llama-3.1-70b-versatile',
     keyPlaceholder: 'gsk_...' 
   }
 };
 
 const KOKORO_VOICES = [
-  { id: 'af', name: 'Alice', lang: 'en-US', gender: '👩', icon: '🎤' },
+  { id: 'af', name: 'Alice', lang: 'en-US', gender: '', icon: '🎤' },
   { id: 'af_bella', name: 'Bella', lang: 'en-US', gender: '👩', icon: '🎵' },
-  { id: 'af_nicole', name: 'Nicole', lang: 'en-US', gender: '👩', icon: '️' },
-  { id: 'af_sarah', name: 'Sarah', lang: 'en-US', gender: '👩', icon: '' },
-  { id: 'af_sky', name: 'Sky', lang: 'en-US', gender: '👩', icon: '' },
-  { id: 'am_adam', name: 'Adam', lang: 'en-US', gender: '👨', icon: '' },
-  { id: 'am_michael', name: 'Michael', lang: 'en-US', gender: '👨', icon: '' },
-  { id: 'bf_emma', name: 'Emma', lang: 'en-GB', gender: '👩', icon: '🇬🇧' },
-  { id: 'bf_isabella', name: 'Isabella', lang: 'en-GB', gender: '', icon: '🎭' },
-  { id: 'bm_george', name: 'George', lang: 'en-GB', gender: '', icon: '🇬🇧' },
+  { id: 'af_nicole', name: 'Nicole', lang: 'en-US', gender: '👩', icon: '🎙️' },
+  { id: 'af_sarah', name: 'Sarah', lang: 'en-US', gender: '👩', icon: '🎶' },
+  { id: 'af_sky', name: 'Sky', lang: 'en-US', gender: '👩', icon: '🌸' },
+  { id: 'am_adam', name: 'Adam', lang: 'en-US', gender: '👨', icon: '🎤' },
+  { id: 'am_michael', name: 'Michael', lang: 'en-US', gender: '👨', icon: '🎵' },
+  { id: 'bf_emma', name: 'Emma', lang: 'en-GB', gender: '👩', icon: '🇧' },
+  { id: 'bf_isabella', name: 'Isabella', lang: 'en-GB', gender: '👩', icon: '🎭' },
+  { id: 'bm_george', name: 'George', lang: 'en-GB', gender: '👨', icon: '🇬🇧' },
   { id: 'bm_lewis', name: 'Lewis', lang: 'en-GB', gender: '👨', icon: '' },
-  { id: 'af_alloy', name: 'Alloy', lang: 'en-US', gender: '👨', icon: '' },
+  { id: 'af_alloy', name: 'Alloy', lang: 'en-US', gender: '👨', icon: '⚡' },
   { id: 'af_echo', name: 'Echo', lang: 'en-US', gender: '👨', icon: '' },
-  { id: 'af_fable', name: 'Fable', lang: 'en-US', gender: '👩', icon: '' },
+  { id: 'af_fable', name: 'Fable', lang: 'en-US', gender: '👩', icon: '📖' },
   { id: 'af_onyx', name: 'Onyx', lang: 'en-US', gender: '👨', icon: '⚫' },
   { id: 'af_nova', name: 'Nova', lang: 'en-US', gender: '👩', icon: '⭐' },
   { id: 'af_shimmer', name: 'Shimmer', lang: 'en-US', gender: '👩', icon: '✨' }
@@ -86,6 +86,7 @@ let speakQueue = [];
 let isSpeakingQueue = false;
 let kokoroTTS = null;
 let kokoroLoading = false;
+let kokoroLoaded = false;
 
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -156,7 +157,6 @@ function bindEvents() {
   $('voiceTalkBtn')?.addEventListener('click', toggleVoiceSession);
   $('voiceStopBtn')?.addEventListener('click', stopVoiceSession);
   $('voiceMuteBtn')?.addEventListener('click', toggleMute);
-  $('appearanceBtn')?.addEventListener('click', () => openSettingsSection('appearance'));
   $('engineBadge')?.addEventListener('click', () => openSettingsSection('engine'));
   $('closeModalBtn')?.addEventListener('click', closeModal);
   $('closeVideoBtn')?.addEventListener('click', closeVideo);
@@ -393,7 +393,7 @@ async function sendMessage() {
           saveState();
           renderMessages();
         } else {
-          addMessage(chat, 'assistant', state.youtubeKey ? 'No encontré videos para esa sugerencia.' : '🔑 Para buscar videos necesito tu YouTube API Key. Ve a Ajustes → API Keys.');
+          addMessage(chat, 'assistant', state.youtubeKey ? 'No encontré videos para esa sugerencia.' : ' Para buscar videos necesito tu YouTube API Key. Ve a Ajustes → API Keys.');
           saveState();
           renderMessages();
         }
@@ -478,9 +478,6 @@ function getPersonalityPrompt(personality, nombre) {
 
 function buildPrompt(chat) {
   const nombre = state.name || 'Usuario';
-  const memoriaBlock = state.memoria.length
-    ? '\nLO QUE YA SABES DE ' + nombre.toUpperCase() + ' (de conversaciones anteriores, cualquier chat — trátalo como si siempre lo hubieras sabido, nunca lo menciones como algo que "recuperaste" o "leíste"):\n' + state.memoria.map(m => '- ' + m).join('\n') + '\n'
-    : '';
   let prompt = getPersonalityPrompt(state.personality || 'JARVIS', nombre) + `
 CÓMO RESPONDES SEGÚN LO QUE SIENTE ${nombre}:
 Si está triste: escuchas primero. No saltas a "arreglar" el problema antes de que la persona termine de expresarlo.
@@ -598,12 +595,12 @@ function readableError(error) {
     const status = parts[2];
     const detail = parts.slice(3).join(' ').trim();
     const label = PROVIDERS[providerId]?.label || providerId;
-    if (status === '401') return ' ' + label + ' Key inválida.';
-    if (status === '429') return '⏳ Límite de ' + label + ' alcanzado.';
+    if (status === '401') return '🔐 ' + label + ' Key inválida.';
+    if (status === '429') return ' Límite de ' + label + ' alcanzado.';
     return '⚠️ Error de ' + label + ': ' + (detail || 'sin detalle');
   }
   if (message === 'NETWORK_OFFLINE') return '⚠️ No hay conexión con Internet.';
-  if (message === 'OFFLINE_UNAVAILABLE') return ' llama.cpp no está disponible. Asegúrate de que esté corriendo en 127.0.0.1:8080 con CORS habilitado.';
+  if (message === 'OFFLINE_UNAVAILABLE') return '🏠 llama.cpp no está disponible. Asegúrate de que esté corriendo en 127.0.0.1:8080 con CORS habilitado.';
   if (message.startsWith('LLAMA')) return '🏠 Error en llama.cpp.';
   return '⚠️ Ocurrió un error.';
 }
@@ -660,24 +657,41 @@ function configureVoices() {
 
 if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = configureVoices;
 
-// --- KOKORO TTS FUNCTIONS ---
-async function initKokoro() {
+// --- KOKORO TTS CON BARRA DE PROGRESO ---
+async function initKokoro(progressCallback) {
   if (kokoroTTS || kokoroLoading) return;
-  if (!window.KokoroTTS) {
-    toast('⚠️ Kokoro no disponible');
-    return;
-  }
   kokoroLoading = true;
-  toast(' Cargando Kokoro...');
+  
   try {
-    kokoroTTS = await window.KokoroTTS.fromPretrained({
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+      progress += Math.random() * 15;
+      if (progress > 90) progress = 90;
+      if (progressCallback) progressCallback(Math.floor(progress), 'Descargando modelo de voz...');
+    }, 300);
+    
+    const module = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.1.0/+esm');
+    const KokoroTTS = module.KokoroTTS || module.default;
+    
+    clearInterval(progressInterval);
+    if (progressCallback) progressCallback(95, 'Inicializando modelo...');
+    
+    kokoroTTS = await KokoroTTS.fromPretrained({
       model: 'kokoro-v1.0',
       dtype: 'q8'
     });
-    toast('✅ Kokoro listo - ' + KOKORO_VOICES.length + ' voces');
+    
+    if (progressCallback) progressCallback(100, '¡Listo!');
+    kokoroLoaded = true;
+    
+    setTimeout(() => {
+      if (progressCallback) progressCallback(-1, '');
+    }, 1500);
+    
   } catch (error) {
     console.error('Error cargando Kokoro:', error);
-    toast('⚠️ Error al cargar Kokoro');
+    if (progressCallback) progressCallback(-2, 'Error al cargar');
+    kokoroLoading = false;
   } finally {
     kokoroLoading = false;
   }
@@ -780,7 +794,7 @@ function dictate() {
   try {
     recognition.start();
   } catch (error) {
-    if (error.name !== 'InvalidStateError') toast('⚠️ Error al iniciar dictado');
+    if (error.name !== 'InvalidStateError') toast('️ Error al iniciar dictado');
   }
 }
 
@@ -793,7 +807,7 @@ function toggleVoiceSession() { if (voiceSession) stopVoiceSession(); else start
 
 function startVoiceSession() {
   if (!SpeechRecognitionAPI) return toast('⚠️ Reconocimiento de voz no soportado');
-  if (state.voiceMuted) return toast('🔇 Activa la voz primero');
+  if (state.voiceMuted) return toast(' Activa la voz primero');
   voiceSession = true;
   voiceBusy = false;
   $('voiceTalkBtn')?.classList.add('active');
@@ -1008,7 +1022,7 @@ async function searchYouTube(query) {
     if (!data.items?.length) return null;
     const links = data.items.map(i => 'https://www.youtube.com/watch?v=' + i.id.videoId);
     const itemsFull = data.items.map((i, x) => ({ title: i.snippet.title, channel: i.snippet.channelTitle, url: links[x] }));
-    const text = data.items.map((i, x) => (x + 1) + '. ' + i.snippet.title + '\n👤 ' + i.snippet.channelTitle + '\n📺 ' + links[x]).join('\n\n');
+    const text = data.items.map((i, x) => (x + 1) + '. ' + i.snippet.title + '\n ' + i.snippet.channelTitle + '\n📺 ' + links[x]).join('\n\n');
     return { links, items: itemsFull, text: '🎬 Resultados:\n\n' + text + '\n\n_Di 1, 2 o 3 para reproducir._' };
   } catch (error) {
     console.error('YouTube search error:', error);
@@ -1132,7 +1146,6 @@ function renderMessages() {
     const content = document.createElement('div');
     content.className = 'message-content';
     
-    // Markdown para la IA, escape seguro para el usuario
     if (m.role === 'assistant' || m.role === 'system') {
       content.innerHTML = marked.parse(m.content);
     } else {
@@ -1175,14 +1188,14 @@ function showTyping(show) {
 function openLibrary() {
   const chat = currentChat();
   const files = chat.archivos || [];
-  let html = '<h3> Biblioteca</h3><p>' + files.length + '/' + CONFIG.maxFilesPerChat + ' archivo(s)</p>';
+  let html = '<h3>📚 Biblioteca</h3><p>' + files.length + '/' + CONFIG.maxFilesPerChat + ' archivo(s)</p>';
   if (!files.length) html += '<p style="color:#888">🛫 No hay archivos.</p>';
-  files.forEach((file, index) => { html += '<div class="file"><span>📄 ' + escapeHTML(file.nombre) + '</span><button class="danger" onclick="removeFile(' + index + ')">🗑️</button></div>'; });
-  html += '<button class="modalBtn" onclick="pickFiles()"> Agregar archivos</button>';
+  files.forEach((file, index) => { html += '<div class="file"><span>📄 ' + escapeHTML(file.nombre) + '</span><button class="danger" onclick="removeFile(' + index + ')">️</button></div>'; });
+  html += '<button class="modalBtn" onclick="pickFiles()">📂 Agregar archivos</button>';
   if (files.length >= CONFIG.maxFilesPerChat) {
-    html += '<p style="color:#888;font-size:12px;margin-top:8px">️ Límite de ' + CONFIG.maxFilesPerChat + ' archivos alcanzado.</p>';
+    html += '<p style="color:#888;font-size:12px;margin-top:8px">⚠️ Límite de ' + CONFIG.maxFilesPerChat + ' archivos alcanzado.</p>';
   }
-  modal('📚 Biblioteca', html);
+  modal(' Biblioteca', html);
 }
 
 function pickFiles() {
@@ -1205,7 +1218,7 @@ async function readFile(file) {
     return;
   }
   if (file.size > CONFIG.maxFileSize) {
-    toast('️ Archivo muy grande (máx ' + (CONFIG.maxFileSize / 1024 / 1024) + 'MB)');
+    toast('⚠️ Archivo muy grande (máx ' + (CONFIG.maxFileSize / 1024 / 1024) + 'MB)');
     return;
   }
   const ext = file.name.split('.').pop().toLowerCase();
@@ -1238,9 +1251,9 @@ function openSettingsSection(section) {
   let title = '', content = '';
   if (section === 'profile') {
     title = '👤 Perfil';
-    content = '<div class="form"><label>Nombre</label><input id="cfgName" value="' + escapeAttribute(state.name) + '"></div><div class="form"><label>Personalidad</label><select id="cfgPersonality"><option value="JARVIS"' + (state.personality === 'JARVIS' ? ' selected' : '') + '>JARVIS 🔥</option><option value="Amigable"' + (state.personality === 'Amigable' ? ' selected' : '') + '>Amigable 😊</option><option value="Formal"' + (state.personality === 'Formal' ? ' selected' : '') + '>Formal 🎩</option></select></div><button class="modalBtn" onclick="saveProfile()"> Guardar</button>';
+    content = '<div class="form"><label>Nombre</label><input id="cfgName" value="' + escapeAttribute(state.name) + '"></div><div class="form"><label>Personalidad</label><select id="cfgPersonality"><option value="JARVIS"' + (state.personality === 'JARVIS' ? ' selected' : '') + '>JARVIS </option><option value="Amigable"' + (state.personality === 'Amigable' ? ' selected' : '') + '>Amigable 😊</option><option value="Formal"' + (state.personality === 'Formal' ? ' selected' : '') + '>Formal 🎩</option></select></div><button class="modalBtn" onclick="saveProfile()">💾 Guardar</button>';
   } else if (section === 'voice') {
-    title = '️ Estilo de Voz';
+    title = '🎙️ Estilo de Voz';
     content = `
       <div class="voice-engine-selector">
         <label>Motor de Voz</label>
@@ -1251,12 +1264,14 @@ function openSettingsSection(section) {
             <div class="engine-desc">Rápido, sin descarga</div>
           </div>
           <div class="engine-option-voice ${state.voiceEngine === 'kokoro' ? 'active' : ''}" onclick="setVoiceEngine('kokoro')">
-            <div class="engine-icon">🎭</div>
+            <div class="engine-icon"></div>
             <div class="engine-name">Kokoro</div>
             <div class="engine-desc">${KOKORO_VOICES.length} voces naturales</div>
           </div>
         </div>
       </div>
+      
+      <div id="kokoroProgressContainer"></div>
       
       <label>Selecciona una voz:</label>
       <div class="voice-selector-grid">
@@ -1284,16 +1299,16 @@ function openSettingsSection(section) {
     content = '<div class="form"><label>Tema</label><select id="cfgTheme"><option value="dark"' + (state.theme === 'dark' ? ' selected' : '') + '>Oscuro </option><option value="light"' + (state.theme === 'light' ? ' selected' : '') + '>Claro ☀️</option></select></div><div class="form"><label>Fondo</label><input id="cfgBg" value="' + escapeAttribute(state.fondo || '') + '" placeholder="URL"><button class="inlineFile" onclick="document.getElementById(\'bgFile\').click()">📁 Imagen</button><input id="bgFile" type="file" accept="image/*" hidden onchange="loadBackgroundFile(event)"></div><button class="modalBtn" onclick="saveAppearance()">💾 Guardar</button><button class="danger" onclick="clearBackground()">🗑️ Quitar fondo</button>';
   } else if (section === 'bubble') {
     title = '🫧 Burbuja';
-    content = '<label><input id="cfgBubbleEnabled" type="checkbox"' + (state.bubbleEnabled ? ' checked' : '') + '> Mostrar burbuja</label><button class="modalBtn" onclick="openBubbleGifPicker()">🎞️ Seleccionar GIF</button><button class="modalBtn" onclick="saveBubble()">💾 Guardar</button><button class="danger" onclick="resetBubble()"> Restaurar</button>';
+    content = '<label><input id="cfgBubbleEnabled" type="checkbox"' + (state.bubbleEnabled ? ' checked' : '') + '> Mostrar burbuja</label><button class="modalBtn" onclick="openBubbleGifPicker()">🎞️ Seleccionar GIF</button><button class="modalBtn" onclick="saveBubble()">💾 Guardar</button><button class="danger" onclick="resetBubble()">🔄 Restaurar</button>';
   } else if (section === 'memory') {
-    title = ' Memoria';
+    title = '📚 Memoria';
     content = '<p style="opacity:.65;font-size:12.5px;margin-bottom:12px">Esto es lo que Aipher recuerda de ti en todas tus conversaciones, sin importar el chat. Lo va guardando solo, con criterio, mientras hablan.</p>'
     + (state.memoria.length
       ? state.memoria.map((m, i) => '<div class="chatItem"><span>' + escapeHTML(m) + '</span><button onclick="forgetMemory(' + i + ')" aria-label="Olvidar">✕</button></div>').join('')
       : '<p style="opacity:.5;font-size:12.5px">Aún no hay nada guardado.</p>')
     + (state.memoria.length ? '<button class="danger" style="margin-top:12px" onclick="clearMemory()">🗑️ Olvidar todo</button>' : '');
   } else if (section === 'engine') {
-    title = '🧠 Motor IA';
+    title = ' Motor IA';
     content = '<div class="engine-option' + (state.engine === 'offline' ? ' active' : '') + '" onclick="setEngine(\'offline\')"><strong>🏠 Offline — llama.cpp</strong><small>IA local sin Internet. Requiere llama.cpp en 127.0.0.1:8080 con CORS habilitado.</small></div>'
     + '<div style="margin:14px 0 6px;opacity:.65;font-size:13px">🌐 Online — elige tu motor:</div>'
     + Object.keys(PROVIDERS).map(id => {
@@ -1312,21 +1327,66 @@ function openSettingsSection(section) {
     + '<div class="form"><label>YouTube Key</label><input type="password" id="cfgYT" placeholder="' + (state.youtubeKey ? 'Clave guardada' : 'AIza...') + '"></div><button class="modalBtn" onclick="saveAPI()">💾 Guardar</button>';
   } else if (section === 'data') {
     title = '💾 Datos';
-    content = '<button class="modalBtn" onclick="exportData()">📤 Exportar</button><button class="modalBtn" onclick="importData()"> Importar</button><button class="danger" onclick="clearAllData()">🗑️ Borrar todo</button>';
+    content = '<button class="modalBtn" onclick="exportData()">📤 Exportar</button><button class="modalBtn" onclick="importData()">📥 Importar</button><button class="danger" onclick="clearAllData()">🗑️ Borrar todo</button>';
   } else {
     title = 'ℹ️ Acerca';
     content = '<p style="text-align:center">🔥 <strong>Aipher v' + CONFIG.version + '</strong><br>Asistente personal con IA<br>🌐 Groq · 🏠 llama.cpp · 📺 YouTube · 🎭 Kokoro TTS<br><br><small>Las API keys se almacenan localmente en tu navegador.</small></p>';
   }
   modal(title, content);
   renderLogoSystem();
+  
+  if (section === 'voice' && kokoroLoaded) {
+    const container = $('kokoroProgressContainer');
+    if (container) {
+      container.innerHTML = '<div class="kokoro-ready">✅ Kokoro listo — 17 voces disponibles</div>';
+    }
+  }
 }
 
-// Funciones nuevas para Kokoro
 function setVoiceEngine(engine) {
   state.voiceEngine = engine;
   saveState();
   openSettingsSection('voice');
-  if (engine === 'kokoro') initKokoro();
+  if (engine === 'kokoro' && !kokoroLoaded) {
+    const container = $('kokoroProgressContainer');
+    if (container) {
+      container.innerHTML = `
+        <div class="kokoro-download-bar">
+          <div class="download-title">
+            <div class="spinner"></div>
+            <span id="kokoroStatusText">Preparando descarga...</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="kokoroProgressFill"></div>
+          </div>
+          <div class="progress-text" id="kokoroProgressText">0%</div>
+          <div class="progress-status" id="kokoroStatusSub">Conectando al servidor...</div>
+        </div>
+      `;
+    }
+    initKokoro((progress, status) => {
+      if (progress === -1) {
+        const cont = $('kokoroProgressContainer');
+        if (cont) cont.innerHTML = '<div class="kokoro-ready">✅ Kokoro listo — 17 voces disponibles</div>';
+        return;
+      }
+      if (progress === -2) {
+        const cont = $('kokoroProgressContainer');
+        if (cont) cont.innerHTML = '<div style="padding:12px;border-radius:10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ff7f7f;font-size:13px;margin:15px 0">️ Error al cargar Kokoro. Revisa tu conexión.</div>';
+        return;
+      }
+      const fill = $('kokoroProgressFill');
+      const text = $('kokoroProgressText');
+      const statusText = $('kokoroStatusText');
+      const statusSub = $('kokoroStatusSub');
+      if (fill) fill.style.width = progress + '%';
+      if (text) text.textContent = progress + '%';
+      if (statusText) statusText.textContent = status;
+      if (statusSub && progress < 50) statusSub.textContent = 'Descargando modelo (~300MB)...';
+      else if (statusSub && progress < 90) statusSub.textContent = 'Procesando...';
+      else if (statusSub) statusSub.textContent = 'Casi listo...';
+    });
+  }
 }
 
 function selectKokoroVoice(voiceId) {
@@ -1336,14 +1396,20 @@ function selectKokoroVoice(voiceId) {
 }
 
 async function previewVoice(voiceId) {
-  if (!kokoroTTS) await initKokoro();
-  if (!kokoroTTS) return;
+  if (!kokoroTTS) {
+    toast('⏳ Kokoro aún se está cargando...');
+    await initKokoro();
+    if (!kokoroTTS) return;
+  }
   const voice = KOKORO_VOICES.find(v => v.id === voiceId);
-  const text = `Hola, soy ${voice.name}. Esta es una prueba de voz.`;
+  const text = 'Hola, soy ' + voice.name + '. Esta es una prueba de voz.';
   try {
     const audio = await kokoroTTS.generate(text, { voice: voiceId, speed: 1 });
     await audio.play();
-  } catch (error) { console.error('Error preview:', error); }
+  } catch (error) { 
+    console.error('Error preview:', error);
+    toast('⚠️ Error al reproducir');
+  }
 }
 
 function saveVoiceSettings() {
@@ -1372,14 +1438,14 @@ function closeModal() { $('modalBackdrop')?.classList.add('hidden'); }
 
 function saveProfile() { state.name = $('cfgName')?.value.trim() || 'Usuario'; state.personality = $('cfgPersonality')?.value || 'JARVIS'; saveState(); renderMessages(); closeModal(); toast('✅ Guardado'); }
 function saveVoice() { state.voiceRate = Number($('cfgRate')?.value) || 1; state.voicePitch = Number($('cfgPitch')?.value) || 1; state.voiceEnabled = Boolean($('cfgVoiceEnabled')?.checked); configureVoices(); saveState(); closeModal(); toast('✅ Guardado'); }
-function testVoice() { try { speak('Hola, soy Aipher.'); } catch (e) { toast('⚠️ No hay voces disponibles en este dispositivo'); } }
+function testVoice() { try { speak('Hola, soy Aipher.'); } catch (e) { toast('️ No hay voces disponibles en este dispositivo'); } }
 function saveAppearance() { state.theme = $('cfgTheme')?.value || 'dark'; state.fondo = $('cfgBg')?.value.trim() || ''; saveState(); applyTheme(); applyBackground(); closeModal(); toast('✅ Guardado'); }
-function clearBackground() { state.fondo = ''; saveState(); applyBackground(); closeModal(); toast('️ Quitado'); }
+function clearBackground() { state.fondo = ''; saveState(); applyBackground(); closeModal(); toast('🗑️ Quitado'); }
 
 function loadBackgroundFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  if (file.size > CONFIG.maxFileSize) { toast('⚠️ Imagen muy grande (máx 10MB)'); return; }
+  if (file.size > CONFIG.maxFileSize) { toast('️ Imagen muy grande (máx 10MB)'); return; }
   const reader = new FileReader();
   reader.onload = e => {
     state.fondo = e.target.result;
@@ -1398,7 +1464,7 @@ function applyBackground() {
   if (!state.fondo) { area.style.backgroundImage = ''; return; }
   const img = new Image();
   img.onload = () => { area.style.backgroundImage = 'url("' + String(state.fondo).replaceAll('"', '%22') + '")'; };
-  img.onerror = () => { area.style.backgroundImage = ''; toast('️ Imagen no válida'); };
+  img.onerror = () => { area.style.backgroundImage = ''; toast('⚠️ Imagen no válida'); };
   img.src = state.fondo;
 }
 
@@ -1411,7 +1477,7 @@ function saveAPI() {
   if (yt) state.youtubeKey = yt;
   saveState();
   closeModal();
-  toast(' Guardado');
+  toast('🔑 Guardado');
 }
 
 function exportData() {
@@ -1532,7 +1598,7 @@ function registerServiceWorker() {
           const newWorker = reg.installing;
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              toast('🔄 Nueva versión disponible. Recarga para actualizar.');
+              toast(' Nueva versión disponible. Recarga para actualizar.');
             }
           });
         });
