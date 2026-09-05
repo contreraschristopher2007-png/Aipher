@@ -1605,4 +1605,3 @@ Object.assign(window, {
   forgetMemory, clearMemory, setVoiceEngine, selectKokoroVoice, previewVoice,
   saveVoiceSettings, testCurrentVoice
 });
-  
