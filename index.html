@@ -1,93 +1,84 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#111318">
-  <meta name="description" content="Aipher — asistente personal con IA Online y Offline">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Aipher">
+  <meta name="description" content="Asistente personal con IA Online y Offline">
   <title>Aipher</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,450;0,9..144,500;0,9..144,600;1,9..144,450;1,9..144,500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  
+  <!-- Dependencias para Markdown y lectura de archivos -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  
+  <!-- Kokoro TTS (Motor de voz neuronal) -->
+  <script type="module">
+    import { KokoroTTS } from 'https://cdn.jsdelivr.net/npm/kokoro-js@1.1.0/+esm';
+    window.KokoroTTS = KokoroTTS;
+  </script>
 </head>
-<body>
-
+<body class="theme-dark">
   <a href="#appMain" class="skip-link">Saltar al contenido</a>
 
-  <svg id="aipherLogoTemplate" class="aipher-logo-template" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M50 7C55 19 47 25 42 34C38 41 41 47 48 50C44 39 51 32 59 27C58 38 67 43 69 53C71 63 65 72 56 77C66 75 74 68 77 59C81 70 76 82 66 89C57 95 44 96 34 91C22 85 16 75 18 63C19 53 25 46 31 40C30 50 34 57 41 60C37 49 36 42 41 34C45 27 52 20 50 7Z" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M48 61C45 68 47 74 53 77C58 80 63 77 65 72" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-  </svg>
-
-  <aside id="sideMenu" aria-label="Menú de conversaciones">
-    <header class="panel-header">
-      <div class="panel-title">
-        <span class="brand-logo" data-aipher-logo aria-hidden="true"></span>
-        <strong>Aipher</strong>
-      </div>
-      <button id="closeMenuBtn" class="icon-btn" type="button" aria-label="Cerrar menú">×</button>
-    </header>
-    <button id="newChatBtn" class="primary-btn accent-control" type="button">＋ Nuevo chat</button>
-    <div class="search-box">
-      <span aria-hidden="true">🔎</span>
-      <input id="chatSearch" type="search" placeholder="Buscar chats" autocomplete="off" aria-label="Buscar chats">
-    </div>
-    <div id="chatList" class="chat-list" aria-label="Lista de conversaciones"></div>
-    <div class="panel-footer">
-      <button id="settingsBtn" class="setting-btn" type="button">⚙️ Ajustes</button>
-    </div>
-  </aside>
-
-  <main id="appMain">
+  <div id="appMain">
+    <!-- Topbar -->
     <header class="topbar">
-      <button id="menuBtn" class="icon-btn" type="button" aria-label="Abrir menú">☰</button>
       <div class="topbar-brand">
-        <span class="brand-logo" data-aipher-logo aria-hidden="true"></span>
+        <button id="menuBtn" class="icon-btn" aria-label="Menú">☰</button>
+        <div class="brand-logo" data-aipher-logo>
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
         <strong>Aipher</strong>
       </div>
       <div class="topbar-actions">
-        <button id="engineBadge" class="engine-badge" type="button">🟢 ONLINE</button>
-        <button id="appearanceBtn" class="icon-btn" type="button" aria-label="Apariencia">☀️</button>
+        <button id="engineBadge" class="engine-badge">🟢 ONLINE</button>
+        <button id="settingsBtn" class="icon-btn" aria-label="Ajustes">⚙️</button>
       </div>
     </header>
 
-    <nav class="mode-tabs" aria-label="Modo de Aipher">
-      <button id="chatModeBtn" class="mode-tab active accent-control" type="button">💬 Chat</button>
-      <button id="voiceModeBtn" class="mode-tab" type="button">🎙️ Voz</button>
-    </nav>
+    <!-- Mode Tabs -->
+    <div class="mode-tabs">
+      <button id="chatModeBtn" class="mode-tab active">💬 Chat</button>
+      <button id="voiceModeBtn" class="mode-tab">🎙️ Voz</button>
+    </div>
 
-    <section id="chatMode" class="mode active" aria-label="Chat">
+    <!-- Chat Mode -->
+    <div id="chatMode" class="mode active">
       <div id="chatArea" class="chat-area">
-        <div id="messages" class="messages" aria-live="polite" aria-relevant="additions"></div>
-      </div>
-      <div id="typingIndicator" class="typing-indicator hidden" aria-hidden="true">
-        <div class="typing-avatar"><span class="brand-logo small" data-aipher-logo></span></div>
-        <div class="typing-content"><span>Aipher está pensando</span><div class="typing-dots"><i></i><i></i><i></i></div></div>
+        <div id="messages" class="messages"></div>
+        <div id="typingIndicator" class="typing-indicator hidden">
+          <div class="typing-avatar" data-aipher-logo>
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          </div>
+          <div class="typing-content">
+            <span>Aipher está pensando</span>
+            <div class="typing-dots"><i></i><i></i><i></i></div>
+          </div>
+        </div>
       </div>
       <div class="composer">
-        <button id="attachBtn" class="composer-btn" type="button" aria-label="Abrir biblioteca">📎</button>
+        <button id="attachBtn" class="composer-btn" aria-label="Adjuntar">📎</button>
         <div class="composer-input-wrap">
-          <textarea id="messageInput" maxlength="10000" placeholder="Escribe a Aipher..." rows="1" autocomplete="off" aria-label="Mensaje"></textarea>
+          <textarea id="messageInput" placeholder="Escribe un mensaje..." rows="1"></textarea>
           <span id="charCounter" class="char-counter">0/10000</span>
         </div>
-        <button id="voiceBtn" class="composer-btn" type="button" aria-label="Dictar mensaje">🎙️</button>
-        <button id="sendBtn" class="send-btn accent-control" type="button" aria-label="Enviar mensaje">➤</button>
+        <button id="voiceBtn" class="composer-btn" aria-label="Dictar">🎙️</button>
+        <button id="sendBtn" class="send-btn" aria-label="Enviar"></button>
       </div>
-    </section>
+    </div>
 
-    <section id="voiceMode" class="mode" aria-label="Conversación por voz">
+    <!-- Voice Mode -->
+    <div id="voiceMode" class="mode">
       <div class="voice-stage">
         <div id="voiceOrb" class="voice-orb">
-          <div id="voiceOrbRings" class="voice-orb-rings"><span></span><span></span><span></span></div>
-          <div id="voiceOrbIcon" class="voice-orb-icon"><span class="brand-logo voice-logo" data-aipher-logo></span></div>
+          <div class="voice-orb-icon" data-aipher-logo>
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          </div>
+          <div class="voice-orb-rings"><span></span><span></span><span></span></div>
         </div>
         <div class="voice-info">
           <h2 id="voiceStatus">Listo para conversar</h2>
@@ -95,54 +86,112 @@
         </div>
       </div>
       <div class="voice-controls">
-        <button id="voiceStopBtn" class="voice-control" type="button" aria-label="Detener">⏹</button>
-        <button id="voiceTalkBtn" class="voice-control voice-main-btn accent-control" type="button" aria-label="Hablar">🎙️</button>
-        <button id="voiceMuteBtn" class="voice-control" type="button" aria-label="Silenciar">🔊</button>
+        <button id="voiceStopBtn" class="voice-control" aria-label="Detener">⏹</button>
+        <button id="voiceTalkBtn" class="voice-control voice-main-btn" aria-label="Hablar">🎙️</button>
+        <button id="voiceMuteBtn" class="voice-control" aria-label="Silenciar">🔊</button>
       </div>
-    </section>
-  </main>
-
-  <div id="floatingAssistant" class="floating-assistant idle" role="button" tabindex="0" aria-label="Control de voz" aria-pressed="false">
-    <div id="bubbleRings" class="bubble-rings" aria-hidden="true"><span class="ring ring1"></span><span class="ring ring2"></span></div>
-    <div id="bubbleLogoContainer" class="bubble-content"><span id="bubbleLogo" class="brand-logo bubble-logo" data-aipher-logo></span></div>
-    <img id="bubbleGifImage" class="bubble-gif hidden" alt="" aria-hidden="true">
-    <span id="muteIndicator" class="mute-indicator" aria-hidden="true">🔇</span>
-  </div>
-
-  <div id="videoPlayer" class="video-player hidden" role="dialog" aria-label="Reproductor de YouTube">
-    <button id="closeVideoBtn" class="video-close-btn" type="button" aria-label="Cerrar">×</button>
-    <iframe id="videoFrame" title="YouTube" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
-  </div>
-
-  <aside id="settingsPanel" aria-label="Ajustes">
-    <header class="panel-header">
-      <div class="panel-title"><span class="brand-logo small" data-aipher-logo></span><strong>Ajustes</strong></div>
-      <button id="closeSettingsBtn" class="icon-btn" type="button" aria-label="Cerrar">×</button>
-    </header>
-    <div class="settings-list">
-      <button class="setting-btn" data-section="profile" type="button"><span>👤</span><span><strong>Perfil</strong><small>Nombre y personalidad</small></span></button>
-      <button class="setting-btn" data-section="voice" type="button"><span>🎙️</span><span><strong>Voz</strong><small>Voz, velocidad y tono</small></span></button>
-      <button class="setting-btn" data-section="appearance" type="button"><span>🎨</span><span><strong>Temas</strong><small>Grafito, Papel y más</small></span></button>
-      <button class="setting-btn" data-section="bubble" type="button"><span>🫧</span><span><strong>Burbuja</strong><small>Animación y GIF</small></span></button>
-      <button class="setting-btn" data-section="memory" type="button"><span>📚</span><span><strong>Memoria</strong><small>Lo que Aipher recuerda de ti</small></span></button>
-      <button class="setting-btn setting-engine" data-section="engine" type="button"><span>🧠</span><span class="setting-engine-text"><strong>Motor IA</strong><small id="settingsEngineStatus">🌐 Online — Groq</small></span><span id="settingsEngineIndicator" class="engine-indicator online"></span></button>
-      <button class="setting-btn" data-section="api" type="button"><span>🔑</span><span><strong>API Keys</strong><small>Groq y YouTube</small></span></button>
-      <button class="setting-btn" data-section="data" type="button"><span>💾</span><span><strong>Datos</strong><small>Importar y exportar</small></span></button>
-      <button class="setting-btn" data-section="about" type="button"><span>ℹ️</span><span><strong>Acerca de Aipher</strong><small>Aipher v4.5.1</small></span></button>
     </div>
-  </aside>
 
-  <div id="modalBackdrop" class="modal-backdrop hidden" aria-hidden="true">
-    <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <header class="modal-header"><h3 id="modalTitle"></h3><button id="closeModalBtn" class="icon-btn" type="button" aria-label="Cerrar">×</button></header>
-      <div id="modalContent" class="modal-content"></div>
+    <!-- Floating Assistant -->
+    <div id="floatingAssistant" class="floating-assistant idle" tabindex="0" role="button" aria-pressed="false">
+      <div id="bubbleLogoContainer" class="bubble-content">
+        <div id="bubbleLogo" data-aipher-logo>
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+      </div>
+      <img id="bubbleGifImage" class="bubble-gif hidden" alt="Aipher GIF">
+      <div class="bubble-rings"><div class="ring"></div><div class="ring ring2"></div></div>
+      <div id="muteIndicator" class="mute-indicator">🔇</div>
     </div>
+
+    <!-- Video Player Modal -->
+    <div id="videoPlayer" class="video-player hidden">
+      <button id="closeVideoBtn" class="video-close-btn" aria-label="Cerrar video">×</button>
+      <iframe id="videoFrame" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    </div>
+
+    <!-- Side Menu (Chats) -->
+    <aside id="sideMenu">
+      <div class="panel-header">
+        <div class="panel-title">
+          <div class="brand-logo small" data-aipher-logo>
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          </div>
+          <strong>Aipher</strong>
+        </div>
+        <button id="closeMenuBtn" class="icon-btn" aria-label="Cerrar menú">×</button>
+      </div>
+      <div class="search-box">
+        <span>🔎</span>
+        <input id="chatSearch" type="text" placeholder="Buscar chats...">
+      </div>
+      <button id="newChatBtn" class="primary-btn">＋ Nuevo chat</button>
+      <div id="chatList" class="chat-list"></div>
+    </aside>
+
+    <!-- Settings Panel -->
+    <aside id="settingsPanel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <strong>⚙️ Ajustes</strong>
+        </div>
+        <button id="closeSettingsBtn" class="icon-btn" aria-label="Cerrar ajustes">×</button>
+      </div>
+      <div class="settings-list">
+        <button class="setting-btn" data-section="profile">
+          <span>👤</span><span><strong>Perfil</strong><small>Nombre y personalidad</small></span>
+        </button>
+        <button class="setting-btn" data-section="voice">
+          <span>🎙️</span><span><strong>Estilo de Voz</strong><small>Kokoro y navegador</small></span>
+        </button>
+        <button class="setting-btn" data-section="appearance">
+          <span>🎨</span><span><strong>Temas</strong><small>Grafito, Papel y más</small></span>
+        </button>
+        <button class="setting-btn" data-section="bubble">
+          <span>🫧</span><span><strong>Burbuja</strong><small>Animación y GIF</small></span>
+        </button>
+        <button class="setting-btn" data-section="memory">
+          <span>📚</span><span><strong>Memoria</strong><small>Lo que Aipher recuerda de ti</small></span>
+        </button>
+        <button class="setting-btn" data-section="engine">
+          <span>🧠</span><span><strong>Motor IA</strong><small id="settingsEngineStatus">🌐 Online — Groq</small></span>
+          <span id="settingsEngineIndicator" class="engine-indicator online"></span>
+        </button>
+        <button class="setting-btn" data-section="api">
+          <span>🔑</span><span><strong>API Keys</strong><small>Groq y YouTube</small></span>
+        </button>
+        <button class="setting-btn" data-section="data">
+          <span>💾</span><span><strong>Datos</strong><small>Importar y exportar</small></span>
+        </button>
+        <button class="setting-btn" data-section="about">
+          <span>ℹ️</span><span><strong>Acerca de</strong><small>Aipher v4.6.0</small></span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Modal Backdrop -->
+    <div id="modalBackdrop" class="modal-backdrop hidden">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 id="modalTitle">Ajustes</h3>
+          <button id="closeModalBtn" class="icon-btn" aria-label="Cerrar modal">×</button>
+        </div>
+        <div id="modalContent" class="modal-content"></div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+    
+    <!-- Connection Status -->
+    <div id="connectionStatus" class="connection-status hidden"></div>
+
+    <!-- Hidden Logo Template for cloning -->
+    <svg id="aipherLogoTemplate" class="aipher-logo-template" viewBox="0 0 24 24">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
   </div>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <div id="connectionStatus" class="connection-status hidden" aria-live="polite"></div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth.js/1.6.0/mammoth.browser.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
