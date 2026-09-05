@@ -30,7 +30,7 @@
       "short_name": "Chat",
       "description": "Iniciar una nueva conversación",
       "url": "./?action=newchat",
-      "icons": [{"src": "icon-192.png", "sizes": "192x192"}]
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
     }
   ]
 }
