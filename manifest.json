@@ -1,7 +1,7 @@
 {
   "name": "Aipher",
   "short_name": "Aipher",
-  "description": "Asistente personal con IA Online y Offline",
+  "description": "Aipher — asistente personal con IA Online y Offline",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0d0f13",
@@ -11,15 +11,15 @@
   "scope": "./",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 7C55 19 47 25 42 34C38 41 41 47 48 50C44 39 51 32 59 27C58 38 67 43 69 53C71 63 65 72 56 77C66 75 74 68 77 59C81 70 76 82 66 89C57 95 44 96 34 91C22 85 16 75 18 63C19 53 25 46 31 40C30 50 34 57 41 60C37 49 36 42 41 34C45 27 52 20 50 7Z' fill='none' stroke='%23ff6b35' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M48 61C45 68 47 74 53 77C58 80 63 77 65 72' fill='none' stroke='%23ff6b35' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.png",
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 7C55 19 47 25 42 34C38 41 41 47 48 50C44 39 51 32 59 27C58 38 67 43 69 53C71 63 65 72 56 77C66 75 74 68 77 59C81 70 76 82 66 89C57 95 44 96 34 91C22 85 16 75 18 63C19 53 25 46 31 40C30 50 34 57 41 60C37 49 36 42 41 34C45 27 52 20 50 7Z' fill='none' stroke='%23ff6b35' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M48 61C45 68 47 74 53 77C58 80 63 77 65 72' fill='none' stroke='%23ff6b35' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]
