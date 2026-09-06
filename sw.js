@@ -1,4 +1,5 @@
-const CACHE_NAME = 'aipher-v4.7.2';
+const CACHE_NAME = 'aipher-v4.7.3';
+
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -11,14 +12,16 @@ const ASSETS_TO_CACHE = [
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        return cache.addAll(ASSETS_TO_CACHE)
-          .catch(error => {
-            console.warn('Aipher SW: algunos assets no se cachearon', error);
-          });
-      })
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(async cache => {
+      await Promise.all(ASSETS_TO_CACHE.map(async asset => {
+        try {
+          await cache.add(asset);
+        } catch (error) {
+          console.warn('Aipher SW: no se pudo cachear', asset);
+        }
+      }));
+    })
+    .then(() => self.skipWaiting())
   );
 });
 
@@ -27,7 +30,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys => {
       return Promise.all(
         keys.filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
+            .map(key => caches.delete(key))
       );
     }).then(() => self.clients.claim())
   );
@@ -38,10 +41,8 @@ self.addEventListener('message', event => {
 });
 
 self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if (event.request.method !== 'GET' || url.origin !== self.location.origin) {
-    return;
-  }
   if (url.hostname === 'api.groq.com' ||
       url.hostname === 'www.googleapis.com' ||
       url.hostname === '127.0.0.1' ||
@@ -59,6 +60,11 @@ self.addEventListener('fetch', event => {
               caches.open(CACHE_NAME)
                 .then(cache => {
                   cache.put(event.request, responseClone);
+                  cache.keys().then(keys => {
+                    if (keys.length > 150) {
+                      cache.delete(keys[0]);
+                    }
+                  });
                 });
             }
             return response;
