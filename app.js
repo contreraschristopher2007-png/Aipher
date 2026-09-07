@@ -1,7 +1,7 @@
 'use strict';
 
 const CONFIG = {
-  version: '4.7.2',
+  version: '4.7.3',
   offlineURL: 'http://127.0.0.1:8080/v1/chat/completions',
   healthURL: 'http://127.0.0.1:8080/health',
   youtubeURL: 'https://www.googleapis.com/youtube/v3/search',

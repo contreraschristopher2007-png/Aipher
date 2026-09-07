@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aipher-v4.7.2';
+const CACHE_NAME = 'aipher-v4.7.3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
