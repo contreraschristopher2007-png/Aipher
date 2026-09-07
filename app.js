@@ -1,7 +1,7 @@
 'use strict';
 
 const CONFIG = {
-  version: '4.7.1',
+  version: '4.7.2',
   offlineURL: 'http://127.0.0.1:8080/v1/chat/completions',
   healthURL: 'http://127.0.0.1:8080/health',
   youtubeURL: 'https://www.googleapis.com/youtube/v3/search',
@@ -1508,8 +1508,15 @@ async function readFile(file) {
     saveState(); renderMessages(); openLibrary();
     toast('✅ ' + file.name + ' indexado');
   } catch (error) {
-    const reason = error.message === 'DOCUMENT_TOO_LARGE' ? 'supera 25 MB' : error.message === 'EMPTY_DOCUMENT' ? 'no contiene texto legible' : error.message === 'UNSUPPORTED_DOCUMENT' ? 'tipo de archivo no compatible' : 'no pude procesarlo';
-    toast('⚠️ ' + file.name + ': ' + reason);
+    console.error('Aipher readFile:', file?.name, error);
+    const reason = error.message === 'DOCUMENT_TOO_LARGE' ? 'supera 25 MB'
+      : error.message === 'EMPTY_DOCUMENT' ? 'no contiene texto legible'
+      : error.message === 'UNSUPPORTED_DOCUMENT' ? 'tipo de archivo no compatible'
+      : error.message === 'DOCUMENT_SAVE_ERROR' ? 'no se pudo guardar en la base de datos local'
+      : error.message === 'PDF' ? 'el lector de PDF no cargó'
+      : error.message === 'DOCX' ? 'el lector de DOCX (Mammoth) no cargó'
+      : 'no pude procesarlo — detalle: ' + (error?.message || String(error));
+    toast('⚠️ ' + file.name + ': ' + reason, 6000);
   }
 }
 
@@ -1635,7 +1642,7 @@ async function importData() {
 }
 async function clearAllData() { if (!confirm('¿Borrar todo?')) return; localStorage.removeItem('aipher_state'); await clearDocumentStore(); location.reload(); }
 function resizeComposer() { const input = $('messageInput'); if (!input) return; input.style.height = 'auto'; input.style.height = Math.min(110, input.scrollHeight) + 'px'; $('charCounter').textContent = input.value.length + '/10000'; }
-function toast(message) { const el = $('toast'); if (!el) return; el.textContent = message; el.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('show'), 2300); }
+function toast(message, duration = 2300) { const el = $('toast'); if (!el) return; el.textContent = message; el.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('show'), duration); }
 function escapeHTML(value) { const div = document.createElement('div'); div.textContent = String(value ?? ''); return div.innerHTML; }
 function escapeAttribute(value) { return escapeHTML(value).replace(/"/g, '&quot;'); }
 function updateConnectionStatus(offlineAvailable = null) { const el = $('connectionStatus'); if (!el) return; if (state.engine === 'online') { if (navigator.onLine === false) { el.textContent = '⚠️ Sin conexión'; el.classList.remove('hidden'); return; } el.classList.add('hidden'); return; } if (offlineAvailable === false) { el.textContent = '🏠 llama.cpp no disponible'; el.classList.remove('hidden'); } else { el.classList.add('hidden'); } }
