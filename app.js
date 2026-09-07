@@ -1,7 +1,7 @@
 'use strict';
 
 const CONFIG = {
-  version: '4.7.0',
+  version: '4.7.1',
   offlineURL: 'http://127.0.0.1:8080/v1/chat/completions',
   healthURL: 'http://127.0.0.1:8080/health',
   youtubeURL: 'https://www.googleapis.com/youtube/v3/search',
@@ -1448,7 +1448,13 @@ async function migrateLegacyDocuments() {
 function pickFiles() {
   const input = document.createElement('input');
   input.type = 'file'; input.multiple = true;
-  input.accept = '.txt,.json,.md,.csv,.html,.xml,.log,.py,.js,.java,.c,.cpp,.h,.sh,.pdf,.docx';
+  input.accept = '.txt,.json,.md,.csv,.html,.xml,.log,.py,.js,.java,.c,.cpp,.h,.sh,.pdf,.docx,' +
+    'text/plain,application/json,text/markdown,text/csv,text/html,application/xhtml+xml,' +
+    'text/xml,application/xml,text/x-python,application/x-python-code,' +
+    'text/javascript,application/javascript,text/x-java-source,text/x-csrc,text/x-c,text/x-c++src,' +
+    'application/x-sh,application/x-shellscript,application/pdf,' +
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document,' +
+    'application/octet-stream';
   input.onchange = async e => {
     const files = Array.from(e.target.files || []);
     for (const file of files) await readFile(file);
@@ -1571,7 +1577,7 @@ function openSettingsSection(section) {
     content = '<button class="modalBtn" onclick="exportData()">📤 Exportar</button><button class="modalBtn" onclick="importData()">📥 Importar</button><button class="danger" onclick="clearAllData()">🗑 Borrar todo</button>';
   } else {
     title = 'ℹ️ Acerca';
-    content = '<p style="text-align:center">🔥 <strong>Aipher v4.6.1</strong><br>Asistente personal con IA<br>🌐 Groq · 🏠 llama.cpp · 📺 YouTube</p>';
+    content = '<p style="text-align:center">🔥 <strong>Aipher v' + CONFIG.version + '</strong><br>Asistente personal con IA<br>🌐 Groq · 🏠 llama.cpp · 📺 YouTube</p>';
   }
   modal(title, content);
   renderLogoSystem();
